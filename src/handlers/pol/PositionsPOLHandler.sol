@@ -166,7 +166,6 @@ contract PositionsPOLHandler is
     }
 
     /// @notice Withdraw tokens from a reward vault.
-    /// @dev Also transfers any accrued rewards.
     /// @param _withdrawData The withdrawal data passed by the entrypoint contract.
     /// @param _to The address to direct the withdrawn tokens to.
     /// @return The token address.
