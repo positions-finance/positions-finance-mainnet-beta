@@ -8,11 +8,9 @@ import {ERC721Upgradeable} from "@openzeppelin-contracts-upgradeable-5.3.0/token
 
 /// @title PositionsNFT.
 /// @author Positions Team.
-/// @notice The positions Nft serves as a unique identifier to track each user's position. This Nft is behind a proxy
-/// (UUPSUpgradeable). The positions Nft serves as the proof of collateral for cross-chain intents.
+/// @notice The positions Nft serves as a unique identifier to track each user's position.
+/// The positions Nft serves as the proof of collateral for cross-chain intents.
 contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, AccessControlUpgradeable {
-    error CooldownNotElapsed();
-
     /// @notice Only operators with the relayer role can mint positions Nft for users.
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     /// @notice A cooldown period between consecutive Nft transfers.
@@ -21,13 +19,14 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
     /// @notice Checks if the positions Nft is currently transferrable or not.
     bool public isTransferPaused;
     /// @dev Tracks the total number of Nfts minted so far. Also used as a counter to mint tokenIds.
-    uint256 private _totalSupply;
+    uint256 public totalSupply;
     /// @notice A mapping to track the UNIX timestamp (in seconds) when a positions Nft was last transferred.
     mapping(uint256 => uint256) public lastTransferTimestamp;
 
     event TransfersPaused();
     event TransfersUnpaused();
 
+    error CooldownNotElapsed();
     error TransferPaused();
     error PositionsNftAlreadyMinted();
 
@@ -38,12 +37,13 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
         _;
     }
 
-    /// @notice Allows the initialization of the proxy.
-    /// @param _admin The initial contract admin.
+    /// @notice Initializes the proxy.
+    /// @param _admin The initial admin.
     function initialize(address _admin) public initializer {
         __ERC721_init("PositionsNFT", "PNFT");
         __UUPSUpgradeable_init();
         __AccessControl_init();
+
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
     }
 
@@ -62,48 +62,43 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
     }
 
     /// @notice Allows a relayer to mint a positions Nft to a user address.
-    function mint(address to) external onlyRole(RELAYER_ROLE) {
-        if (balanceOf(to) > 0) revert PositionsNftAlreadyMinted();
+    function mint(address _to) external onlyRole(RELAYER_ROLE) {
+        if (balanceOf(_to) > 0) revert PositionsNftAlreadyMinted();
 
-        uint256 tokenId = ++_totalSupply;
-        _mint(to, tokenId);
-    }
-
-    /// @dev Tracks the total number of Nfts minted so far. Also used as a counter to mint tokenIds.
-    function totalSupply() public view returns (uint256) {
-        return _totalSupply;
+        uint256 tokenId = ++totalSupply;
+        _mint(_to, tokenId);
     }
 
     /// @notice Overriding transferFrom to check if transfers are paused or if the cooldown period
     /// is still active.
-    /// @param from The address to transfer the Nft from.
-    /// @param to The address to transfer the Nft to.
-    /// @param tokenId The Nft tokenId.
-    function transferFrom(address from, address to, uint256 tokenId)
+    /// @param _from The address to transfer the Nft from.
+    /// @param _to The address to transfer the Nft to.
+    /// @param _tokenId The Nft tokenId.
+    function transferFrom(address _from, address _to, uint256 _tokenId)
         public
         override
-        shouldHavePassedCoolDown(tokenId)
+        shouldHavePassedCoolDown(_tokenId)
     {
         if (isTransferPaused) revert TransferPaused();
 
-        lastTransferTimestamp[tokenId] = block.timestamp;
-        super.transferFrom(from, to, tokenId);
+        lastTransferTimestamp[_tokenId] = block.timestamp;
+        super.transferFrom(_from, _to, _tokenId);
     }
 
     /// @notice Overriding safeTransferFrom to check if transfers are paused or if the cooldown period
     /// is still active.
-    /// @param from The address to transfer the Nft from.
-    /// @param to The address to transfer the Nft to.
-    /// @param tokenId The Nft tokenId.
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data)
+    /// @param _from The address to transfer the Nft from.
+    /// @param _to The address to transfer the Nft to.
+    /// @param _tokenId The Nft tokenId.
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes memory _data)
         public
         override
-        shouldHavePassedCoolDown(tokenId)
+        shouldHavePassedCoolDown(_tokenId)
     {
         if (isTransferPaused) revert TransferPaused();
 
-        lastTransferTimestamp[tokenId] = block.timestamp;
-        super.safeTransferFrom(from, to, tokenId, data);
+        lastTransferTimestamp[_tokenId] = block.timestamp;
+        super.safeTransferFrom(_from, _to, _tokenId, _data);
     }
 
     /// @notice Overriding the UUPS Upgrade authorization to only allow the default admin to upgrade the proxy implementation.
