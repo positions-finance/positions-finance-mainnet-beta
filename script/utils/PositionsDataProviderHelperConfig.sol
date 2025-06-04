@@ -20,8 +20,6 @@ contract PositionsDataProviderHelperConfig is Script, ChainIds {
             activeNetworkConfig = _getHoleskyTestnetConfig();
         } else if (block.chainid == BEPOLIA_CHAIN_ID) {
             activeNetworkConfig = _getBepoliaConfig();
-        } else if (block.chainid == PEGASUS_CHAIN_ID) {
-            activeNetworkConfig = _getPegasusConfig();
         } else if (block.chainid == ARB_SEPOLIA_CHAIN_ID) {
             activeNetworkConfig = _getArbSepoliaConfig();
         } else if (block.chainid == BOBA_SEPOLIA_CHAIN_ID) {

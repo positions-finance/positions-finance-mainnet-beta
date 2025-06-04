@@ -21,8 +21,6 @@ contract VaultsEntrypointHelperConfig is Script, ChainIds {
             activeNetworkConfig = _getHoleskyTestnetConfig();
         } else if (block.chainid == BEPOLIA_CHAIN_ID) {
             activeNetworkConfig = _getBepoliaConfig();
-        } else if (block.chainid == PEGASUS_CHAIN_ID) {
-            activeNetworkConfig = _getPegasusConfig();
         } else {
             revert HelperConfig__UnsupportedChain(block.chainid);
         }

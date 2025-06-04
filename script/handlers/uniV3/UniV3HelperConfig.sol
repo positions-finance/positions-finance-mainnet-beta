@@ -5,12 +5,12 @@ import {Script} from "forge-std-1.9.7/src/Script.sol";
 
 import {ChainIds} from "../../utils/ChainIds.sol";
 
-contract LendingPoolHelperConfig is Script, ChainIds {
+contract UniV3HelperConfig is Script, ChainIds {
     struct NetworkConfig {
-        address entrypoint;
+        address relayer;
+        address nonFungiblePositionManager;
         address admin;
         address upgrader;
-        address lendingPool;
     }
 
     NetworkConfig private activeNetworkConfig;
@@ -18,28 +18,30 @@ contract LendingPoolHelperConfig is Script, ChainIds {
     error HelperConfig__UnsupportedChain(uint256 chainId);
 
     constructor() {
-        if (block.chainid == BEPOLIA_CHAIN_ID) {
+        if (block.chainid == ETH_MAINNET_CHAIN_ID) {
+            activeNetworkConfig = _getEthConfig();
+        } else if (block.chainid == BEPOLIA_CHAIN_ID) {
             activeNetworkConfig = _getBepoliaConfig();
         } else {
             revert HelperConfig__UnsupportedChain(block.chainid);
         }
     }
 
-    function _getPegasusConfig() private pure returns (NetworkConfig memory) {
+    function _getEthConfig() private pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            entrypoint: address(0),
+            relayer: address(0),
+            nonFungiblePositionManager: address(0),
             admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            lendingPool: 0x68190A0083b21085638Ab6b3310FEB592b3DD84f
+            upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687
         });
     }
 
     function _getBepoliaConfig() private pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            entrypoint: 0x69b4CA1Dc34E234738Ce4Efe900b7Cc3e19607d6,
+            relayer: address(0),
+            nonFungiblePositionManager: address(0),
             admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            lendingPool: 0xcFD775857cc33F08f731F3049FF43848BC75D34C
+            upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687
         });
     }
 
