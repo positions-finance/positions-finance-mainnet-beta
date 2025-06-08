@@ -23,6 +23,7 @@ interface IPositionsInfraredVaultHandler is IHandler {
     event OracleSet(address newOracle);
     event InfraredVaultAdded(address infraredVault, address stakingToken);
     event InfraredVaultRemoved(address infraredVault);
+    event RelayerSet(address relayer);
 
     error PositionsInfraredVaultHandler__InsufficientBalance(
         uint256 tokenId, uint256 positionBalance, uint256 withdrawalAmount
@@ -31,19 +32,20 @@ interface IPositionsInfraredVaultHandler is IHandler {
     error PositionsInfraredVaultHandler__UnsupportedToken();
     error PositionsInfraredVaultHandler__InfraredVaultDoesNotExist();
     error PositionsInfraredVaultHandler__NotStakingToken();
-    error PositionsInfraredVaultHandler__NftOwnershipVerificationFailed(address user, uint256 tokenId);
+    error PositionsInfraredVaultHandler__NFTOwnershipVerificationFailed(address user, uint256 tokenId);
 
     function initialize(address _admin, address _upgrader, address _entryPoint, address _poc, address _oracle)
         external;
     function setEntrypoint(address _newEntryPoint) external;
-    function setProofOfCollateral(address _newProofOfCollateral) external;
+    function setRelayer(address _newRelayer) external;
     function setOracle(address _newOracle) external;
     function addInfraredVaults(address[] calldata _infraredVaults, address[] calldata _stakingTokens) external;
     function removeInfraredVaults(address[] calldata _infraredVaults) external;
-    function getReward(address[] calldata _infraredVaults, uint256 _tokenId, address _receiver) external;
+    function getReward(address[] calldata _infraredVaults, uint256 _tokenId, bytes32[] memory _proof, address _receiver)
+        external;
     function getUpgraderRole() external pure returns (bytes32);
     function getEntryPoint() external view returns (address);
-    function getProofOfCollateral() external view returns (address);
+    function getRelayer() external view returns (address);
     function getOracle() external view returns (address);
     function getInfraredVaults() external view returns (address[] memory);
     function getInfraredVaultStakingToken(address _infraredVault) external view returns (address);

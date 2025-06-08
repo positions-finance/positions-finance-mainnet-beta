@@ -21,6 +21,8 @@ contract VaultsEntrypointHelperConfig is Script, ChainIds {
             activeNetworkConfig = _getHoleskyTestnetConfig();
         } else if (block.chainid == BEPOLIA_CHAIN_ID) {
             activeNetworkConfig = _getBepoliaConfig();
+        } else if (block.chainid == BERACHAIN_MAINNET_CHAIN_ID) {
+            activeNetworkConfig = _getBerachainConfig();
         } else {
             revert HelperConfig__UnsupportedChain(block.chainid);
         }
@@ -42,11 +44,11 @@ contract VaultsEntrypointHelperConfig is Script, ChainIds {
         });
     }
 
-    function _getPegasusConfig() private pure returns (NetworkConfig memory) {
+    function _getBerachainConfig() private pure returns (NetworkConfig memory) {
         return NetworkConfig({
             admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
             upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            relayer: 0xab2E47DbFcce1DAEB527fD4FEdAF0d9C7BC6460A
+            relayer: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687
         });
     }
 

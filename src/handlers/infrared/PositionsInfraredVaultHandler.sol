@@ -17,6 +17,7 @@ import {IMultiRewards} from "../../interfaces/handlers/infrared/IMultiRewards.so
 import {IPriceOracle} from "../../interfaces/oracle/IPriceOracle.sol";
 import {IPositionsDataProvider} from "../../interfaces/utils/IPositionsDataProvider.sol";
 import {IPositionsVaultsEntrypoint} from "../../interfaces/entryPoint/IPositionsVaultsEntrypoint.sol";
+import {IPositionsRelayer} from "./../../interfaces/poc/IPositionsRelayer.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {UserVaultBalance} from "../../utils/PositionsDataProvider.sol";
@@ -38,10 +39,10 @@ contract PositionsInfraredVaultHandler is
 
     /// @notice The positions vaults entry point contract address.
     address private s_entryPoint;
-    /// @dev The proof of collateral contract address.
-    address private s_poc;
     /// @dev The price oracle to fetch token prices from.
     address private s_oracle;
+    /// @dev The relayer address.
+    address private s_relayer;
     /// @dev A set of supported infrared vaults.
     EnumerableSet.AddressSet private s_infraredVaults;
     /// @notice Mapping to store the staking token associated with each supported infrared vault.
@@ -55,9 +56,8 @@ contract PositionsInfraredVaultHandler is
     /// @param _admin The admin address.
     /// @param _upgrader The upgrader address which receives the upgrader role.
     /// @param _entryPoint The positions vaults entry point contract address.
-    /// @param _poc The proof of collateral contract address.
     /// @param _oracle The oracle contract address.
-    function initialize(address _admin, address _upgrader, address _entryPoint, address _poc, address _oracle)
+    function initialize(address _admin, address _upgrader, address _entryPoint, address _relayer, address _oracle)
         public
         initializer
     {
@@ -68,7 +68,7 @@ contract PositionsInfraredVaultHandler is
         _grantRole(UPGRADER_ROLE, _upgrader);
 
         s_entryPoint = _entryPoint;
-        s_poc = _poc;
+        s_relayer = _relayer;
         s_oracle = _oracle;
     }
 
@@ -82,14 +82,14 @@ contract PositionsInfraredVaultHandler is
         emit EntrypointSet(_newEntryPoint);
     }
 
-    /// @notice Allows the admin to set the new proof of collateral contract address.
-    /// @param _newProofOfCollateral The new proof of collateral contract address.
-    function setProofOfCollateral(address _newProofOfCollateral) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        Utils.requireNotAddressZero(_newProofOfCollateral);
+    /// @notice Allows the admin to set the new relayer contract address.
+    /// @param _newRelayer The new relayer contract address.
+    function setRelayer(address _newRelayer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        Utils.requireNotAddressZero(_newRelayer);
 
-        s_poc = _newProofOfCollateral;
+        s_relayer = _newRelayer;
 
-        emit ProofOfCollateralSet(_newProofOfCollateral);
+        emit RelayerSet(_newRelayer);
     }
 
     /// @notice Allows the admin to set the new oracle contract address.
@@ -198,15 +198,7 @@ contract PositionsInfraredVaultHandler is
         _requireCallerIsEntryPoint();
         _checkIfInfraredVaultExists(infraredVault);
 
-        uint256 positionBalance = s_positions[infraredVault][_withdrawData.tokenId].balance;
-        if (positionBalance < _withdrawData.amount) {
-            revert PositionsInfraredVaultHandler__InsufficientBalance(
-                _withdrawData.tokenId, positionBalance, _withdrawData.amount
-            );
-        }
-
         _updateReward(infraredVault, _withdrawData.tokenId);
-        s_positions[infraredVault][_withdrawData.tokenId].balance -= _withdrawData.amount;
 
         IInfraredVault(infraredVault).withdraw(_withdrawData.amount);
         IERC20(stakingToken).safeTransfer(_to, _withdrawData.amount);
@@ -274,9 +266,11 @@ contract PositionsInfraredVaultHandler is
     /// @notice Collect rewards from infrared vaults.
     /// @param _infraredVaults The infrared vault addresses.
     /// @param _tokenId The user's nft tokenId.
-    function getReward(address[] calldata _infraredVaults, uint256 _tokenId, address _receiver) external {
+    function getReward(address[] calldata _infraredVaults, uint256 _tokenId, bytes32[] memory _proof, address _receiver)
+        external
+    {
         Utils.requireNotAddressZero(_receiver);
-        _verifyNftOwnership(_tokenId, msg.sender);
+        _validateNFTOwnership(_tokenId, _proof);
 
         for (uint256 i; i < _infraredVaults.length; ++i) {
             if (!s_infraredVaults.contains(_infraredVaults[i])) {
@@ -311,16 +305,14 @@ contract PositionsInfraredVaultHandler is
         }
     }
 
-    function _requireIsStakingToken(address _token, address _stakingToken) internal pure {
-        if (_token != _stakingToken) revert PositionsInfraredVaultHandler__NotStakingToken();
+    function _validateNFTOwnership(uint256 _tokenId, bytes32[] memory _proof) internal view {
+        if (!IPositionsRelayer(s_relayer).verifyNFTOwnership(msg.sender, _tokenId, _proof)) {
+            revert PositionsInfraredVaultHandler__NFTOwnershipVerificationFailed(msg.sender, _tokenId);
+        }
     }
 
-    function _verifyNftOwnership(uint256 _tokenId, address _caller) internal view {
-        address owner = IERC721(s_poc).ownerOf(_tokenId);
-
-        if (owner != _caller) {
-            revert PositionsInfraredVaultHandler__NftOwnershipVerificationFailed(_caller, _tokenId);
-        }
+    function _requireIsStakingToken(address _token, address _stakingToken) internal pure {
+        if (_token != _stakingToken) revert PositionsInfraredVaultHandler__NotStakingToken();
     }
 
     function _updateReward(address _infraredVault, uint256 _tokenId) internal {
@@ -356,10 +348,10 @@ contract PositionsInfraredVaultHandler is
         return s_entryPoint;
     }
 
-    /// @notice Gets the proof of collateral contract address.
-    /// @return The proof of collateral contract address.
-    function getProofOfCollateral() external view returns (address) {
-        return s_poc;
+    /// @notice Gets the relayer contract address.
+    /// @return The relayer contract address.
+    function getRelayer() external view returns (address) {
+        return s_relayer;
     }
 
     /// @notice Gets the oracle contract address.

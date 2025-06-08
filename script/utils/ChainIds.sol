@@ -10,4 +10,5 @@ abstract contract ChainIds {
     uint64 constant BOBA_SEPOLIA_CHAIN_ID = 28882;
     uint64 constant MANTA_SEPOLIA_CHAIN_ID = 3441006;
     uint64 constant MONAD_CHAIN_ID = 10143;
+    uint256 public constant BERACHAIN_MAINNET_CHAIN_ID = 80094;
 }
