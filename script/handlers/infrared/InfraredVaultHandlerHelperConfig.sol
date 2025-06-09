@@ -62,11 +62,11 @@ contract InfraredVaultHandlerHelperConfig is ChainIds {
         // placeholder values, change on each run
 
         return NetworkConfig({
-            admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            entryPoint: 0xF288117B44BD248015f4C85DFd7Fa05d6d6f3d0A,
-            relayer: 0xF6ff5ecdF96DE945D6A076C7eFdb521aCD347334,
-            oracle: 0x21845039B6777A1720388AF29e401A3cE909A8F5
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            upgrader: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            entryPoint: 0x48bd18FD6c1415DfDCC34abd8CcCB50A6ABca40e,
+            relayer: 0xBd955F79b14A7A8c20F661F073b7720c5f522254,
+            oracle: 0xEc46dD85dc81eA631B29178F6Db0e1Bc135E7D2B
         });
     }
 }

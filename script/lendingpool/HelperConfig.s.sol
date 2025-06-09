@@ -20,6 +20,7 @@ uint64 constant PEGASUS_CHAIN_ID = 1891;
 uint64 constant UNICHAIN_SEPOLIA_CHAIN_ID = 1301;
 uint64 constant BOBA_SEPOLIA_CHAIN_ID = 28882;
 uint64 constant MANTA_SEPOLIA_CHAIN_ID = 3441006;
+uint64 constant BERACHAIN_MAINNET_CHAIN_ID = 80094;
 
 contract HelperConfigLendingPool is Script {
     NetworkConfig networkConfig;
@@ -41,6 +42,8 @@ contract HelperConfigLendingPool is Script {
             networkConfig = getBobaSepoliaConfig();
         } else if (block.chainid == MANTA_SEPOLIA_CHAIN_ID) {
             networkConfig = getMantaSepoliaConfig();
+        } else if (block.chainid == BERACHAIN_MAINNET_CHAIN_ID) {
+            networkConfig = getBerachainConfig();
         } else {
             revert("Unsupported chain");
         }
@@ -168,11 +171,25 @@ contract HelperConfigLendingPool is Script {
         assets[3] = 0x2BdE71213545a65dFb707719af940c324bADFcCA; // wbtc
 
         return NetworkConfig({
-            admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             positionsRelayer: 0x0262d9b1C178A216da78DDB386E05D2BB3086149, // placeholder, change on each run
             initialReserveFactor: 1e3,
             assets: assets,
             oracle: address(0)
+        });
+    }
+
+    function getBerachainConfig() internal pure returns (NetworkConfig memory) {
+        address[] memory assets = new address[](2);
+        assets[0] = 0x6969696969696969696969696969696969696969; // wbera
+        assets[1] = 0xFCBD14DC51f0A4d49d5E53C2E0950e0bC26d0Dce; // honey
+
+        return NetworkConfig({
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            positionsRelayer: 0xBd955F79b14A7A8c20F661F073b7720c5f522254, // placeholder, change on each run
+            initialReserveFactor: 1e3,
+            assets: assets,
+            oracle: 0xEc46dD85dc81eA631B29178F6Db0e1Bc135E7D2B
         });
     }
 }

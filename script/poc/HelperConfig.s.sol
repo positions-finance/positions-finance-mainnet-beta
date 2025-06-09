@@ -18,6 +18,8 @@ uint64 constant PEGASUS_CHAIN_ID = 1891;
 uint64 constant UNICHAIN_SEPOLIA_CHAIN_ID = 1301;
 uint64 constant BOBA_SEPOLIA_CHAIN_ID = 28882;
 uint64 constant MANTA_SEPOLIA_CHAIN_ID = 3441006;
+uint64 constant BERACHAIN_MAINNET_CHAIN_ID = 80094;
+uint64 constant ARBITRUM_MAINNET_CHAIN_ID = 42161;
 
 contract HelperConfig is Script {
     NetworkConfig networkConfig;
@@ -39,6 +41,10 @@ contract HelperConfig is Script {
             networkConfig = getBobaSepoliaConfig();
         } else if (block.chainid == MANTA_SEPOLIA_CHAIN_ID) {
             networkConfig = getMantaSepoliaConfig();
+        } else if (block.chainid == BERACHAIN_MAINNET_CHAIN_ID) {
+            networkConfig = getBerachainConfig();
+        } else if (block.chainid == ARBITRUM_MAINNET_CHAIN_ID) {
+            networkConfig = getArbitrumConfig();
         } else {
             revert("Unsupported chain");
         }
@@ -78,7 +84,7 @@ contract HelperConfig is Script {
     function getArbitrumSepoliaConfig() internal pure returns (NetworkConfig memory) {
         return NetworkConfig({
             // placeholder values, change on each run
-            admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             feeReceipient: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
             feePercentage: 100
         });
@@ -116,6 +122,24 @@ contract HelperConfig is Script {
             // placeholder values, change on each run
             admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
             feeReceipient: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
+            feePercentage: 100
+        });
+    }
+
+    function getBerachainConfig() internal pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            // placeholder values, change on each run
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            feeReceipient: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            feePercentage: 100
+        });
+    }
+
+    function getArbitrumConfig() internal pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            // placeholder values, change on each run
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            feeReceipient: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             feePercentage: 100
         });
     }

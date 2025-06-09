@@ -46,9 +46,9 @@ contract VaultsEntrypointHelperConfig is Script, ChainIds {
 
     function _getBerachainConfig() private pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
-            relayer: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            upgrader: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            relayer: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF
         });
     }
 

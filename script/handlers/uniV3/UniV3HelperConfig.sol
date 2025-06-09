@@ -22,6 +22,8 @@ contract UniV3HelperConfig is Script, ChainIds {
             activeNetworkConfig = _getEthConfig();
         } else if (block.chainid == BEPOLIA_CHAIN_ID) {
             activeNetworkConfig = _getBepoliaConfig();
+        } else if (block.chainid == ARBITRUM_MAINNET_CHAIN_ID) {
+            activeNetworkConfig = _getArbitrumConfig();
         } else {
             revert HelperConfig__UnsupportedChain(block.chainid);
         }
@@ -42,6 +44,15 @@ contract UniV3HelperConfig is Script, ChainIds {
             nonFungiblePositionManager: address(0),
             admin: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687,
             upgrader: 0xE5261f469bAc513C0a0575A3b686847F48Bc6687
+        });
+    }
+
+    function _getArbitrumConfig() private pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            relayer: 0xB8fba279f495f92A2D8410543A247862a8856ae1,
+            nonFungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            upgrader: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF
         });
     }
 

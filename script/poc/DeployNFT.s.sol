@@ -22,6 +22,7 @@ contract DeployNFT is Script {
 
         address proxy =
             Upgrades.deployUUPSProxy("PositionsNFT.sol", abi.encodeCall(PositionsNFT.initialize, (config.admin)), opts);
+        PositionsNFT(proxy).pauseTransfers();
 
         vm.stopBroadcast();
 
