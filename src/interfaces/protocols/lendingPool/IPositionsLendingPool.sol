@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import {UserVaultBalance} from "../../../utils/PositionsDataProvider.sol";
 
@@ -22,4 +22,5 @@ interface IPositionsLendingPool {
         external
         view
         returns (UserVaultBalance[] memory);
+    function borrowForLoops(address _token, uint256 _amount) external;
 }

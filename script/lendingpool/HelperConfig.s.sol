@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import {Script} from "forge-std-1.9.7/src/Script.sol";
 
@@ -186,7 +186,7 @@ contract HelperConfigLendingPool is Script {
 
         return NetworkConfig({
             admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
-            positionsRelayer: 0xBd955F79b14A7A8c20F661F073b7720c5f522254, // placeholder, change on each run
+            positionsRelayer: 0xce055Da993a40405C42CA22BbcEF056f94fEB4bB, // placeholder, change on each run
             initialReserveFactor: 1e3,
             assets: assets,
             oracle: 0xEc46dD85dc81eA631B29178F6Db0e1Bc135E7D2B

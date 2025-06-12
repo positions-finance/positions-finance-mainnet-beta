@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title UniversalOracle.
 /// @author Positions Team.
@@ -11,7 +11,7 @@ contract UniversalOracle is Ownable {
 
     event PriceSet(address indexed asset, uint256 indexed price);
 
-    constructor(address _owner) Ownable(_owner) { }
+    constructor(address _owner) Ownable(_owner) {}
 
     /// @notice Allows the owner to set the asset price in usd (e6 denomination).
     /// @param _asset The asset address.

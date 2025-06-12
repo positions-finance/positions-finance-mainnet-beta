@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 library UID {
     function generate(uint256 _nonce, uint256 _chainId, uint256 _nftId, address _protocol)

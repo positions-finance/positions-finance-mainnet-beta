@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.19;
 
 import {Script} from "forge-std-1.9.7/src/Script.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
