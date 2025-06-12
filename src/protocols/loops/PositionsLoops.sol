@@ -50,6 +50,18 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         uint256 borrowIndexSnapshot;
     }
 
+    struct CloseParams {
+        uint256 tokenId;
+        address token;
+        uint256 buffer;
+        uint256 amountLpTokens;
+        bytes32[] proof;
+        uint256 amountTokenMin;
+        uint256 amountOtherTokenMin;
+        uint256 minSwapAmountOut;
+        uint256 deadline;
+    }
+
     /// @dev Relayer role can call relayer functions.
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     /// @dev Upgrader role can upgrade the contract.
@@ -200,99 +212,98 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         emit PositionOpened(msg.sender, _requestId, positionRequestData);
     }
 
-    function closeLeveragedPosition(
-        uint256 _tokenId,
-        address _token,
-        uint256 _buffer,
-        uint256 _amountLpTokens,
-        bytes32[] memory _proof,
-        uint256 _amountTokenMin,
-        uint256 _amountOtherTokenMin,
-        uint256 _minSwapAmountOut,
-        uint256 _deadline
-    ) external {
-        _validateNFTOwnership(_tokenId, _proof);
+    function closeLeveragedPosition(CloseParams memory _params) external {
+        _validateNFTOwnership(_params.tokenId, _params.proof);
 
-        IERC20(pool).safeTransferFrom(vault, address(this), _amountLpTokens);
-        IERC20(_token).safeTransferFrom(msg.sender, address(this), _buffer);
+        IERC20(pool).safeTransferFrom(vault, address(this), _params.amountLpTokens);
+        IERC20(_params.token).safeTransferFrom(msg.sender, address(this), _params.buffer);
 
-        address otherToken = _token == IV2DexPair(pool).token0() ? IV2DexPair(pool).token1() : IV2DexPair(pool).token0();
+        address otherToken =
+            _params.token == IV2DexPair(pool).token0() ? IV2DexPair(pool).token1() : IV2DexPair(pool).token0();
 
-        IERC20(pool).approve(v2DexRouter, _amountLpTokens);
+        IERC20(pool).approve(v2DexRouter, _params.amountLpTokens);
         IV2DexRouter(v2DexRouter).removeLiquidity(
-            _token, otherToken, _amountLpTokens, _amountTokenMin, _amountOtherTokenMin, address(this), _deadline
+            _params.token,
+            otherToken,
+            _params.amountLpTokens,
+            _params.amountTokenMin,
+            _params.amountOtherTokenMin,
+            address(this),
+            _params.deadline
         );
 
         address[] memory path = new address[](2);
         path[0] = otherToken;
-        path[1] = _token;
+        path[1] = _params.token;
 
         uint256 amount = IERC20(otherToken).balanceOf(address(this));
         IERC20(otherToken).approve(v2DexRouter, amount);
-        IV2DexRouter(v2DexRouter).swapExactTokensForTokens(amount, _minSwapAmountOut, path, address(this), _deadline);
-
-        uint256 currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_token).borrowIndex;
-
-        uint256 amountWithInterest = (currentBorrowIndex * positionData[_tokenId][_token].amount)
-            / positionData[_tokenId][_token].borrowIndexSnapshot;
-
-        PositionsLendingPool(lendingPool).repayDebt(
-            _token, IERC20(_token).balanceOf(address(this)), uint256(uint160(address(this)))
+        IV2DexRouter(v2DexRouter).swapExactTokensForTokens(
+            amount, _params.minSwapAmountOut, path, address(this), _params.deadline
         );
 
-        currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_token).borrowIndex;
+        uint256 currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_params.token).borrowIndex;
 
-        positionData[_tokenId][_token].lpTokens -= _amountLpTokens;
-        positionData[_tokenId][_token].amount = amountWithInterest;
-        positionData[_tokenId][_token].borrowIndexSnapshot = currentBorrowIndex;
+        uint256 amountWithInterest = (currentBorrowIndex * positionData[_params.tokenId][_params.token].amount)
+            / positionData[_params.tokenId][_params.token].borrowIndexSnapshot;
 
-        emit PositionClosed(msg.sender, _tokenId, _token);
+        PositionsLendingPool(lendingPool).repayDebt(
+            _params.token, IERC20(_params.token).balanceOf(address(this)), uint256(uint160(address(this)))
+        );
+
+        currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_params.token).borrowIndex;
+
+        positionData[_params.tokenId][_params.token].lpTokens -= _params.amountLpTokens;
+        positionData[_params.tokenId][_params.token].amount = amountWithInterest;
+        positionData[_params.tokenId][_params.token].borrowIndexSnapshot = currentBorrowIndex;
+
+        emit PositionClosed(msg.sender, _params.tokenId, _params.token);
     }
 
-    function liquidate(
-        uint256 _tokenId,
-        address _token,
-        uint256 _buffer,
-        uint256 _amountLpTokens,
-        uint256 _amountTokenMin,
-        uint256 _amountOtherTokenMin,
-        uint256 _minSwapAmountOut,
-        uint256 _deadline
-    ) external onlyRole(RELAYER_ROLE) {
-        IERC20(pool).safeTransferFrom(vault, address(this), _amountLpTokens);
-        IERC20(_token).safeTransferFrom(msg.sender, address(this), _buffer);
+    function liquidate(CloseParams memory _params) external onlyRole(RELAYER_ROLE) {
+        IERC20(pool).safeTransferFrom(vault, address(this), _params.amountLpTokens);
+        IERC20(_params.token).safeTransferFrom(msg.sender, address(this), _params.buffer);
 
-        address otherToken = _token == IV2DexPair(pool).token0() ? IV2DexPair(pool).token1() : IV2DexPair(pool).token0();
+        address otherToken =
+            _params.token == IV2DexPair(pool).token0() ? IV2DexPair(pool).token1() : IV2DexPair(pool).token0();
 
-        IERC20(pool).approve(v2DexRouter, _amountLpTokens);
+        IERC20(pool).approve(v2DexRouter, _params.amountLpTokens);
         IV2DexRouter(v2DexRouter).removeLiquidity(
-            _token, otherToken, _amountLpTokens, _amountTokenMin, _amountOtherTokenMin, address(this), _deadline
+            _params.token,
+            otherToken,
+            _params.amountLpTokens,
+            _params.amountTokenMin,
+            _params.amountOtherTokenMin,
+            address(this),
+            _params.deadline
         );
 
         address[] memory path = new address[](2);
         path[0] = otherToken;
-        path[1] = _token;
+        path[1] = _params.token;
 
         uint256 amount = IERC20(otherToken).balanceOf(address(this));
         IERC20(otherToken).approve(v2DexRouter, amount);
-        IV2DexRouter(v2DexRouter).swapExactTokensForTokens(amount, _minSwapAmountOut, path, address(this), _deadline);
-
-        uint256 currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_token).borrowIndex;
-
-        uint256 amountWithInterest = (currentBorrowIndex * positionData[_tokenId][_token].amount)
-            / positionData[_tokenId][_token].borrowIndexSnapshot;
-
-        PositionsLendingPool(lendingPool).repayDebt(
-            _token, IERC20(_token).balanceOf(address(this)), uint256(uint160(address(this)))
+        IV2DexRouter(v2DexRouter).swapExactTokensForTokens(
+            amount, _params.minSwapAmountOut, path, address(this), _params.deadline
         );
 
-        currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_token).borrowIndex;
+        uint256 currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_params.token).borrowIndex;
 
-        positionData[_tokenId][_token].lpTokens -= _amountLpTokens;
-        positionData[_tokenId][_token].amount = amountWithInterest;
-        positionData[_tokenId][_token].borrowIndexSnapshot = currentBorrowIndex;
+        uint256 amountWithInterest = (currentBorrowIndex * positionData[_params.tokenId][_params.token].amount)
+            / positionData[_params.tokenId][_params.token].borrowIndexSnapshot;
 
-        emit PositionClosed(msg.sender, _tokenId, _token);
+        PositionsLendingPool(lendingPool).repayDebt(
+            _params.token, IERC20(_params.token).balanceOf(address(this)), uint256(uint160(address(this)))
+        );
+
+        currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_params.token).borrowIndex;
+
+        positionData[_params.tokenId][_params.token].lpTokens -= _params.amountLpTokens;
+        positionData[_params.tokenId][_params.token].amount = amountWithInterest;
+        positionData[_params.tokenId][_params.token].borrowIndexSnapshot = currentBorrowIndex;
+
+        emit PositionClosed(msg.sender, _params.tokenId, _params.token);
     }
 
     function _validateNFTOwnership(uint256 _tokenId, bytes32[] memory _proof) internal view {
