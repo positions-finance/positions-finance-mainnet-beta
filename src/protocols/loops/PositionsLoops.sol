@@ -10,16 +10,19 @@ import {UUPSUpgradeable} from "@openzeppelin-contracts-upgradeable-5.3.0/proxy/u
 import {SafeERC20} from "@openzeppelin-contracts-5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin-contracts-5.3.0/utils/structs/EnumerableSet.sol";
 
+import {IBerachainRewardsVault} from "../../interfaces/handlers/pol/IBerachainRewardsVault.sol";
 import {IPriceOracle} from "../../interfaces/oracle/IPriceOracle.sol";
 import {IPositionsRelayer} from "../../interfaces/poc/IPositionsRelayer.sol";
 import {IV2DexPair} from "@src/interfaces/protocols/loops/IV2DexPair.sol";
 import {IV2DexRouter} from "@src/interfaces/protocols/loops/IV2DexRouter.sol";
+
+import {PositionsBGTHandler} from "../../handlers/pol/PositionsBGTHandler.sol";
 import {PositionsLendingPool} from "@src/protocols/lendingPool/PositionsLendingPool.sol";
 
 /// @title PositionsLoops.
 /// @author Positions Team.
 /// @notice A loops contract to open leveraged positions using the positions lending pool.
-contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
+contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradeable, PositionsBGTHandler {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -48,6 +51,8 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         uint256 lpTokens;
         uint256 amount;
         uint256 borrowIndexSnapshot;
+        uint256 unclaimedReward;
+        uint256 rewardsPerTokenPaid;
     }
 
     struct CloseParams {
@@ -66,6 +71,8 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     /// @dev Upgrader role can upgrade the contract.
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    /// @notice Pricesion for BGT.
+    uint256 internal constant PRECISION = 1e18;
 
     address public relayer;
     address public lendingPool;
@@ -84,6 +91,7 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
     );
     event PositionOpened(address indexed by, bytes32 indexed requestId, RequestData indexed positionRequestData);
     event PositionClosed(address indexed caller, uint256 indexed tokenId, address indexed token);
+    event RedeemBGTForBera(address indexed receiver, uint256 indexed tokenId, uint256 indexed earnedAmount);
 
     error PositionsLoops__InvalidToken();
     error PositionsLoops__UnacceptedRequest(bytes32 requestId);
@@ -97,10 +105,12 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         address _lendingPool,
         address _v2DexRouter,
         address _pool,
-        address _vault
+        address _vault,
+        address _bgt
     ) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
+        __PositionsBGTHandler_init(_bgt);
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
@@ -110,6 +120,8 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         v2DexRouter = _v2DexRouter;
         pool = _pool;
         vault = _vault;
+
+        IERC20(pool).approve(vault, type(uint256).max);
     }
 
     function requestOpenLeveragedPosition(
@@ -184,14 +196,14 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
 
         uint256 balance = IERC20(otherToken).balanceOf(address(this));
         IERC20(otherToken).approve(v2DexRouter, balance);
-        IV2DexRouter(v2DexRouter).addLiquidity(
+        (,, uint256 lpTokens) = IV2DexRouter(v2DexRouter).addLiquidity(
             positionRequestData.token,
             otherToken,
             positionRequestData.amount / 2,
             balance,
             positionRequestData.minAmountBorrowToken,
             positionRequestData.minAmountOtherToken,
-            vault,
+            address(this),
             positionRequestData.deadline
         );
 
@@ -202,8 +214,10 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
             currentBorrowIndex * positionData[positionRequestData.tokenId][positionRequestData.token].amount
         ) / positionData[positionRequestData.tokenId][positionRequestData.token].borrowIndexSnapshot;
 
-        positionData[positionRequestData.tokenId][positionRequestData.token].lpTokens +=
-            IERC20(pool).balanceOf(address(this));
+        _updateReward(vault, positionRequestData.tokenId);
+        IBerachainRewardsVault(vault).stake(lpTokens);
+
+        positionData[positionRequestData.tokenId][positionRequestData.token].lpTokens += lpTokens;
         positionData[positionRequestData.tokenId][positionRequestData.token].amount =
             amountWithInterest + positionRequestData.amount;
         positionData[positionRequestData.tokenId][positionRequestData.token].borrowIndexSnapshot =
@@ -213,9 +227,10 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
     }
 
     function closeLeveragedPosition(CloseParams memory _params) external {
-        _validateNFTOwnership(_params.tokenId, _params.proof);
+        if (!hasRole(RELAYER_ROLE, msg.sender)) _validateNFTOwnership(_params.tokenId, _params.proof);
 
-        IERC20(pool).safeTransferFrom(vault, address(this), _params.amountLpTokens);
+        _updateReward(vault, _params.tokenId);
+        IBerachainRewardsVault(vault).withdraw(_params.amountLpTokens);
         IERC20(_params.token).safeTransferFrom(msg.sender, address(this), _params.buffer);
 
         address otherToken =
@@ -260,56 +275,71 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         emit PositionClosed(msg.sender, _params.tokenId, _params.token);
     }
 
-    function liquidate(CloseParams memory _params) external onlyRole(RELAYER_ROLE) {
-        IERC20(pool).safeTransferFrom(vault, address(this), _params.amountLpTokens);
-        IERC20(_params.token).safeTransferFrom(msg.sender, address(this), _params.buffer);
+    /// @notice Redeems BGT rewards for bera native gas token.
+    /// @param _tokenId The user's nft tokenId.
+    /// @param _proof The merkle proof to verify Nft tokenId ownership.
+    function redeemBGTForBera(uint256 _tokenId, bytes32[] calldata _proof) external {
+        _validateNFTOwnership(_tokenId, _proof);
+        address receiver = msg.sender;
 
-        address otherToken =
-            _params.token == IV2DexPair(pool).token0() ? IV2DexPair(pool).token1() : IV2DexPair(pool).token0();
+        IBerachainRewardsVault(vault).getReward(address(this));
 
-        IERC20(pool).approve(v2DexRouter, _params.amountLpTokens);
-        IV2DexRouter(v2DexRouter).removeLiquidity(
-            _params.token,
-            otherToken,
-            _params.amountLpTokens,
-            _params.amountTokenMin,
-            _params.amountOtherTokenMin,
-            address(this),
-            _params.deadline
-        );
+        uint256 earnedAmount = earned(vault, _tokenId);
 
-        address[] memory path = new address[](2);
-        path[0] = otherToken;
-        path[1] = _params.token;
+        positionData[_tokenId][vault].unclaimedReward = 0;
+        positionData[_tokenId][vault].rewardsPerTokenPaid = rewardPerToken(vault);
 
-        uint256 amount = IERC20(otherToken).balanceOf(address(this));
-        IERC20(otherToken).approve(v2DexRouter, amount);
-        IV2DexRouter(v2DexRouter).swapExactTokensForTokens(
-            amount, _params.minSwapAmountOut, path, address(this), _params.deadline
-        );
+        if (address(this).balance < earnedAmount) {
+            _redeemBGTForBera();
+        }
 
-        uint256 currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_params.token).borrowIndex;
+        if (address(this).balance < earnedAmount) {
+            revert PositionsBGTHandler__RedeemBGTForBeraFailed(receiver, _tokenId, earnedAmount);
+        }
 
-        uint256 amountWithInterest = (currentBorrowIndex * positionData[_params.tokenId][_params.token].amount)
-            / positionData[_params.tokenId][_params.token].borrowIndexSnapshot;
+        (bool success,) = receiver.call{value: earnedAmount}("");
 
-        PositionsLendingPool(lendingPool).repayDebt(
-            _params.token, IERC20(_params.token).balanceOf(address(this)), uint256(uint160(address(this)))
-        );
+        if (!success) {
+            revert PositionsBGTHandler__RedeemBGTForBeraFailed(receiver, _tokenId, earnedAmount);
+        }
 
-        currentBorrowIndex = PositionsLendingPool(lendingPool).getReserveData(_params.token).borrowIndex;
-
-        positionData[_params.tokenId][_params.token].lpTokens -= _params.amountLpTokens;
-        positionData[_params.tokenId][_params.token].amount = amountWithInterest;
-        positionData[_params.tokenId][_params.token].borrowIndexSnapshot = currentBorrowIndex;
-
-        emit PositionClosed(msg.sender, _params.tokenId, _params.token);
+        emit RedeemBGTForBera(receiver, _tokenId, earnedAmount);
     }
 
     function _validateNFTOwnership(uint256 _tokenId, bytes32[] memory _proof) internal view {
         if (!IPositionsRelayer(relayer).verifyNFTOwnership(msg.sender, _tokenId, _proof)) {
             revert PositionsLoops__NFTOwnershipVerificationFailed(msg.sender, _tokenId);
         }
+    }
+
+    function _checkAndUpdateUnclaimedBGTBalance(address receiver, uint256 _amount) internal override {}
+
+    function _updateReward(address _rewardVault, uint256 _tokenId) internal {
+        uint256 _rewardPerToken = rewardPerToken(_rewardVault);
+
+        PositionData storage info = positionData[_tokenId][_rewardVault];
+        (info.unclaimedReward, info.rewardsPerTokenPaid) = (earned(_rewardVault, _tokenId), _rewardPerToken);
+    }
+
+    /// @notice Gets the total BGT a user earned from a reward vault.
+    /// @param _rewardVault The reward vault address.
+    /// @param _tokenId The user's Nft tokenId.
+    function earned(address _rewardVault, uint256 _tokenId) public view returns (uint256) {
+        PositionData storage info = positionData[_tokenId][_rewardVault];
+
+        (uint256 balance, uint256 unclaimedReward, uint256 rewardsPerTokenPaid) =
+            (info.amount, info.unclaimedReward, info.rewardsPerTokenPaid);
+        uint256 rewardPerTokenDelta;
+        unchecked {
+            rewardPerTokenDelta = rewardPerToken(_rewardVault) - rewardsPerTokenPaid;
+        }
+        return unclaimedReward + (balance * rewardPerTokenDelta) / PRECISION;
+    }
+
+    /// Gets the value of reward per token of a reward vault.
+    /// @param _rewardVault The reward vault address.
+    function rewardPerToken(address _rewardVault) public view returns (uint256) {
+        return IBerachainRewardsVault(_rewardVault).rewardPerToken();
     }
 
     function _authorizeUpgrade(address newImplementation) internal virtual override onlyRole(UPGRADER_ROLE) {}
