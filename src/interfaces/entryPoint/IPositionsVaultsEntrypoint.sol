@@ -121,7 +121,6 @@ interface IPositionsVaultsEntrypoint {
         address _token,
         uint256 _amount,
         uint256 _tokenId,
-        bytes32[] memory _proof,
         bytes calldata _additionalData
     ) external;
     function queueWithdraw(

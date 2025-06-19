@@ -51,6 +51,7 @@ contract PositionsInfraredVaultHandler is
     mapping(address token => EnumerableSet.AddressSet infraredVaults) private s_stakingTokenToInfraredVaults;
     /// @dev Mapping to track user deposits in infrared vaults.
     mapping(address infraredVault => mapping(uint256 tokenId => PositionInfo)) private s_positions;
+    mapping(uint256 tokenId => address operator) public operators;
 
     /// @notice Initializes the contract.
     /// @param _admin The admin address.
@@ -133,6 +134,14 @@ contract PositionsInfraredVaultHandler is
 
             emit InfraredVaultRemoved(_infraredVaults[i]);
         }
+    }
+
+    function setOperator(uint256 _tokenId, bytes32[] memory _proof, address _operator) external {
+        _validateNFTOwnership(_tokenId, _proof);
+
+        operators[_tokenId] = _operator;
+
+        emit OperatorSet(_tokenId, _operator);
     }
 
     /// @notice Deposits a user's tokens into the infrared vault. Called by the entry point contract.
@@ -270,7 +279,7 @@ contract PositionsInfraredVaultHandler is
         external
     {
         Utils.requireNotAddressZero(_receiver);
-        _validateNFTOwnership(_tokenId, _proof);
+        if (operators[_tokenId] != msg.sender) _validateNFTOwnership(_tokenId, _proof);
 
         for (uint256 i; i < _infraredVaults.length; ++i) {
             if (!s_infraredVaults.contains(_infraredVaults[i])) {

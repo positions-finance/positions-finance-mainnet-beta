@@ -23,6 +23,7 @@ interface IPositionsPOLHandler {
     event RedeemBGTForBera(address indexed sender, uint256 tokenId, uint256 amount);
     event RewardVaultAdded(address indexed rewardVault, RewardVaultInfo rewardVaultInfo);
     event RewardVaultRemoved(address indexed rewardVault);
+    event OperatorSet(uint256 indexed tokenId, address indexed operator);
 
     error PositionsPOLHandler__NotEntryPoint();
     error PositionsPOLHandler__ArrayLengthMismatch();

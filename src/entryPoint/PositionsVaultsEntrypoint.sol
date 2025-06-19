@@ -89,18 +89,15 @@ contract PositionsVaultsEntrypoint is
     /// @param _token The token to deposit.
     /// @param _amount The amount of token to deposit.
     /// @param _tokenId The user's Nft tokenId.
-    /// @param _proof Merkle proof to verify Nft ownership.
     /// @param _additionalData Additional handler-specific data.
     function deposit(
         address _handler,
         address _token,
         uint256 _amount,
         uint256 _tokenId,
-        bytes32[] calldata _proof,
         bytes calldata _additionalData
     ) external {
         _revertIfUnsupportedHandler(_handler);
-        _validateNFTOwnership(_tokenId, _proof);
 
         IERC20(_token).safeTransferFrom(msg.sender, _handler, _amount);
 

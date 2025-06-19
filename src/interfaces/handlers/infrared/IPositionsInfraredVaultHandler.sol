@@ -24,6 +24,7 @@ interface IPositionsInfraredVaultHandler is IHandler {
     event InfraredVaultAdded(address infraredVault, address stakingToken);
     event InfraredVaultRemoved(address infraredVault);
     event RelayerSet(address relayer);
+    event OperatorSet(uint256 indexed tokenId, address indexed operator);
 
     error PositionsInfraredVaultHandler__InsufficientBalance(
         uint256 tokenId, uint256 positionBalance, uint256 withdrawalAmount

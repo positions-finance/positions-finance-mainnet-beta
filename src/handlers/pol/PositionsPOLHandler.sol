@@ -47,6 +47,7 @@ contract PositionsPOLHandler is
     mapping(address => RewardVaultInfo) public rewardVaultInfo;
     /// @dev Mapping to track user deposits in reward vaults.
     mapping(address underlyingVault => mapping(uint256 tokenId => PositionInfo)) private positionInfoMaps;
+    mapping(uint256 tokenId => address operator) public operators;
 
     modifier onlyEntryPoint() {
         if (msg.sender != entrypoint) revert PositionsPOLHandler__NotEntryPoint();
@@ -118,6 +119,14 @@ contract PositionsPOLHandler is
 
             emit RewardVaultRemoved(_rewardVaults[i]);
         }
+    }
+
+    function setOperator(uint256 _tokenId, bytes32[] memory _proof, address _operator) external {
+        _validateNFTOwnership(_tokenId, _proof);
+
+        operators[_tokenId] = _operator;
+
+        emit OperatorSet(_tokenId, _operator);
     }
 
     /// @notice Enables a user to deposit into a reward vault.
@@ -247,7 +256,7 @@ contract PositionsPOLHandler is
     /// @param _tokenId The user's nft tokenId.
     /// @param _proof The merkle proof to verify Nft tokenId ownership.
     function redeemBGTForBera(address[] calldata _rewardVaults, uint256 _tokenId, bytes32[] calldata _proof) external {
-        _validateNFTOwnership(_tokenId, _proof);
+        if (operators[_tokenId] != msg.sender) _validateNFTOwnership(_tokenId, _proof);
         address receiver = msg.sender;
 
         uint256 totalRedeemAmount;
@@ -305,7 +314,7 @@ contract PositionsPOLHandler is
         }
     }
 
-    function _validateNFTOwnership(uint256 _tokenId, bytes32[] calldata _proof) internal view {
+    function _validateNFTOwnership(uint256 _tokenId, bytes32[] memory _proof) internal view {
         if (!IPositionsRelayer(relayer).verifyNFTOwnership(msg.sender, _tokenId, _proof)) {
             revert PositionsPOLHandler__NFTOwnershipVerificationFailed(msg.sender, _tokenId);
         }
