@@ -380,4 +380,8 @@ contract PositionsPOLHandler is
 
         return newUserVaultBalance;
     }
+
+    function getTvl(address _rewardVault) external view returns (uint256) {
+        return IBerachainRewardsVault(_rewardVault).balanceOf(address(this));
+    }
 }

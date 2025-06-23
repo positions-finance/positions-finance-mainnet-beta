@@ -284,7 +284,10 @@ contract PositionsUniV3Handler is UUPSUpgradeable, AccessControlUpgradeable {
 
     /// @notice Callback into the handler once a withdrawal request is accepted.
     /// @param _withdrawalData The withdrawal data.
-    function withdrawalRequestAccepted(IPositionsVaultsEntrypoint.WithdrawData memory _withdrawalData) external {
+    function withdrawalRequestAccepted(IPositionsVaultsEntrypoint.WithdrawData memory _withdrawalData)
+        external
+        onlyRole(RELAYER_ROLE)
+    {
         userNfts[_withdrawalData.tokenId].remove(_withdrawalData.poolOrVault);
         delete nftOwners[_withdrawalData.poolOrVault];
     }

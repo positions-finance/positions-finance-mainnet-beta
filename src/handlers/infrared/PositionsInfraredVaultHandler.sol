@@ -449,4 +449,8 @@ contract PositionsInfraredVaultHandler is
     function getPositionBalance(address _infraredVault, uint256 _tokenId) public view returns (uint256) {
         return s_positions[_infraredVault][_tokenId].balance;
     }
+
+    function getTvl(address _vault) external view returns (uint256) {
+        return IInfraredVault(_vault).balanceOf(address(this));
+    }
 }

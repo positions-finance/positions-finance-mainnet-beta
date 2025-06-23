@@ -23,4 +23,5 @@ interface IPositionsLendingPool {
         view
         returns (UserVaultBalance[] memory);
     function borrowForLoops(address _token, uint256 _amount) external;
+    function userToAssetToLendingInfo(address _user, address _asset) external view returns (uint256, uint256);
 }

@@ -204,4 +204,12 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
 
         return newUserVaultBalance;
     }
+
+    function getTvl(address _asset) external view returns (uint256) {
+        (uint256 depositAmount, uint256 supplyIndex) =
+            IPositionsLendingPool(lendingPool).userToAssetToLendingInfo(address(this), _asset);
+        (,, uint256 currentSupplyIndex,,,) = IPositionsLendingPool(lendingPool).poolData(_asset);
+
+        return ((currentSupplyIndex * depositAmount) / supplyIndex);
+    }
 }
