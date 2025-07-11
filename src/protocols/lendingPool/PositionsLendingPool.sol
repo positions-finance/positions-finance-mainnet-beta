@@ -290,6 +290,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     function supply(address _asset, uint256 _amount, address _for) external {
         if (_asset == address(0)) revert AddressZero();
         if (_amount == 0) revert AmountZero();
+        if (_for == address(0)) revert AddressZero();
 
         PoolData storage lendingPoolData = poolData[_asset];
         LenderInfo storage lenderInfo = userToAssetToLendingInfo[_for][_asset];
@@ -297,7 +298,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         _revertIfLendingPoolDoesNotExist(lendingPoolData);
         _accrueInterest(_asset, lendingPoolData);
 
-        uint256 accruedInterest = _calculateAccruedLenderInterest(_asset, lendingPoolData, lenderInfo);
+        uint256 accruedInterest = _calculateAccruedLenderInterest(lendingPoolData, lenderInfo);
         lenderInfo.depositAmount += _amount + accruedInterest;
         lenderInfo.supplyIndexSnapshot = lendingPoolData.supplyIndex;
 
@@ -322,7 +323,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         _revertIfLendingPoolDoesNotExist(lendingPoolData);
         _accrueInterest(_asset, lendingPoolData);
 
-        uint256 accruedInterest = _calculateAccruedLenderInterest(_asset, lendingPoolData, lenderInfo);
+        uint256 accruedInterest = _calculateAccruedLenderInterest(lendingPoolData, lenderInfo);
         if (_amount > lenderInfo.depositAmount + accruedInterest) revert InsufficientBalance();
 
         uint256 withdrawAmount = _amount;
@@ -346,7 +347,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     ) external returns (bytes32) {
         if (
             _collateralRequest.protocol != address(this) || !supportedAssets.contains(_collateralRequest.token)
-                || _collateralRequest.owner != msg.sender
+                || _collateralRequest.owner != msg.sender || _collateralRequest.tokenAmount == 0
         ) revert InvalidRequest(_collateralRequest);
 
         bytes32 requestId = IPositionsRelayer(positionsRelayer).requestCollateral(_collateralRequest, _signature);
@@ -418,7 +419,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         BorrowerInfo storage borrowerInfo = tokenIdToAssetToBorrowInfo[_tokenId][_asset];
 
         _accrueInterest(_asset, lendingPoolData);
-        uint256 totalDebt = _calculateBorrowerDebt(_asset, lendingPoolData, borrowerInfo);
+        uint256 totalDebt = _calculateBorrowerDebt(lendingPoolData, borrowerInfo);
         _amount = _amount > totalDebt ? totalDebt : _amount;
 
         borrowerInfo.borrowedAmount = totalDebt - _amount;
@@ -454,7 +455,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         }
 
         (uint256 updatedSupplyIndex, uint256 updatedBorrowIndex, uint256 updatedSupplyIndexWithReserveFactor) =
-            _currentSupplyAndBorrowIndex(_asset, _lendingPoolData);
+            _currentSupplyAndBorrowIndex(_lendingPoolData);
 
         uint256 interestCutForTreasury = (
             (
@@ -473,7 +474,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         _lendingPoolData.lastAccrualTimestamp = block.timestamp;
     }
 
-    function _currentSupplyAndBorrowIndex(address _asset, PoolData memory _lendingPoolData)
+    function _currentSupplyAndBorrowIndex(PoolData memory _lendingPoolData)
         internal
         view
         returns (uint256, uint256, uint256)
@@ -485,11 +486,11 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         }
 
         uint256 currentUtilization = _currentUtilization(_lendingPoolData);
-        (uint256 supplyRate, uint256 borrowRate) = _getInterestRates(_asset, _lendingPoolData, currentUtilization);
+        (uint256 supplyRate, uint256 borrowRate) = _getInterestRates(_lendingPoolData, currentUtilization);
 
         uint256 borrowInterestFactor = (_lendingPoolData.borrowIndex * borrowRate * timeElapsed) / (E27 * YEAR);
-        uint256 supplyInterestFactor =
-            (((_lendingPoolData.supplyIndex * currentUtilization) / E27) * ((supplyRate * timeElapsed) / YEAR)) / E27;
+        uint256 supplyInterestFactor = (_lendingPoolData.supplyIndex * supplyRate * timeElapsed) / (E27 * YEAR);
+
         uint256 reserveInterestFactor = (supplyInterestFactor * reserveFactor) / BPS;
 
         return (
@@ -504,7 +505,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         return (_lendingPoolData.totalBorrowed * E27) / _lendingPoolData.totalLent;
     }
 
-    function _getInterestRates(address _asset, PoolData memory _lendingPoolData, uint256 _utilization)
+    function _getInterestRates(PoolData memory _lendingPoolData, uint256 _utilization)
         internal
         view
         returns (uint256 supplyRate, uint256 borrowRate)
@@ -520,40 +521,25 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
                 + (excessUtilization * interestRateModel.slope2) / (E27 - interestRateModel.optimalUtilization);
         }
 
-        uint256 totalBorrowedWithIndex =
-            ((_lendingPoolData.totalBorrowed * E27) / 10 ** IERC20Metadata(_asset).decimals());
-
-        supplyRate = (_overallBorrowRate(totalBorrowedWithIndex, borrowRate) * _utilization) / E27;
+        supplyRate = (borrowRate * _utilization * (BPS - reserveFactor)) / (E27 * BPS);
     }
 
-    function _overallBorrowRate(uint256 totalVariableDebt, uint256 currentBorrowRate) internal pure returns (uint256) {
-        uint256 totalDebt = totalVariableDebt;
-
-        if (totalDebt == 0) return 0;
-
-        uint256 weightedVariableRate = (totalDebt) * (currentBorrowRate);
-
-        uint256 overallBorrowRate = weightedVariableRate / (totalDebt);
-
-        return overallBorrowRate;
-    }
-
-    function _calculateAccruedLenderInterest(
-        address _asset,
-        PoolData memory _lendingPoolData,
-        LenderInfo memory _lenderInfo
-    ) internal view returns (uint256) {
+    function _calculateAccruedLenderInterest(PoolData memory _lendingPoolData, LenderInfo memory _lenderInfo)
+        internal
+        view
+        returns (uint256)
+    {
         if (_lenderInfo.supplyIndexSnapshot == 0) {
             return 0;
         }
 
-        (uint256 currentSupplyIndex,,) = _currentSupplyAndBorrowIndex(_asset, _lendingPoolData);
+        (uint256 currentSupplyIndex,,) = _currentSupplyAndBorrowIndex(_lendingPoolData);
 
         return (currentSupplyIndex * _lenderInfo.depositAmount) / _lenderInfo.supplyIndexSnapshot
             - _lenderInfo.depositAmount;
     }
 
-    function _calculateBorrowerDebt(address _asset, PoolData memory _lendingPoolData, BorrowerInfo memory _borrowerInfo)
+    function _calculateBorrowerDebt(PoolData memory _lendingPoolData, BorrowerInfo memory _borrowerInfo)
         internal
         view
         returns (uint256)
@@ -562,7 +548,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
             return 0;
         }
 
-        (, uint256 updatedBorrowIndex,) = _currentSupplyAndBorrowIndex(_asset, _lendingPoolData);
+        (, uint256 updatedBorrowIndex,) = _currentSupplyAndBorrowIndex(_lendingPoolData);
         uint256 borrowGrowth = (updatedBorrowIndex * _borrowerInfo.borrowedAmount) / _borrowerInfo.borrowIndexSnapshot
             - _borrowerInfo.borrowedAmount;
 
@@ -585,7 +571,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     function getCurrentSupplyAndBorrowIndex(address _asset) external view returns (uint256, uint256) {
         PoolData memory lendingPoolData = poolData[_asset];
 
-        (uint256 supplyIndex, uint256 borrowIndex,) = _currentSupplyAndBorrowIndex(_asset, lendingPoolData);
+        (uint256 supplyIndex, uint256 borrowIndex,) = _currentSupplyAndBorrowIndex(lendingPoolData);
         return (supplyIndex, borrowIndex);
     }
 
@@ -603,7 +589,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         PoolData memory lendingPoolData = poolData[_asset];
         BorrowerInfo memory borrowerInfo = tokenIdToAssetToBorrowInfo[_tokenId][_asset];
 
-        return _calculateBorrowerDebt(_asset, lendingPoolData, borrowerInfo);
+        return _calculateBorrowerDebt(lendingPoolData, borrowerInfo);
     }
 
     /// @notice Gets the interest accrued for a lender based on their supply position for an asset and their supply
@@ -614,7 +600,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         PoolData memory lendingPoolData = poolData[_asset];
         LenderInfo memory lenderInfo = userToAssetToLendingInfo[_lender][_asset];
 
-        return _calculateAccruedLenderInterest(_asset, lendingPoolData, lenderInfo);
+        return _calculateAccruedLenderInterest(lendingPoolData, lenderInfo);
     }
 
     /// @notice Gets the total amount of assets borrowed by a user's Nft tokenId accross all assets in usd
@@ -641,7 +627,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         InterestRateModel memory interestRateModel = lendingPoolData.interestRateModel;
 
         uint256 currentUtilization = _currentUtilization(lendingPoolData);
-        (uint256 supplyRate, uint256 borrowRate) = _getInterestRates(_asset, lendingPoolData, currentUtilization);
+        (uint256 supplyRate, uint256 borrowRate) = _getInterestRates(lendingPoolData, currentUtilization);
 
         return ReserveData({
             totalLiquidity: lendingPoolData.totalLent,

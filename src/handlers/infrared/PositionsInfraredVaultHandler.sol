@@ -128,6 +128,8 @@ contract PositionsInfraredVaultHandler is
         uint256 length = _infraredVaults.length;
 
         for (uint256 i; i < length; ++i) {
+            if (IInfraredVault(_infraredVaults[i]).balanceOf(address(this)) > 0) continue;
+
             s_infraredVaults.remove(_infraredVaults[i]);
             s_stakingTokenToInfraredVaults[s_vaultStakingToken[_infraredVaults[i]]].remove(_infraredVaults[i]);
             delete s_vaultStakingToken[_infraredVaults[i]];
@@ -177,7 +179,6 @@ contract PositionsInfraredVaultHandler is
         address infraredVault = abi.decode(_additionalData, (address));
         address stakingToken = s_vaultStakingToken[infraredVault];
 
-        _requireCallerIsEntryPoint();
         _checkIfInfraredVaultExists(infraredVault);
         _requireIsStakingToken(_token, stakingToken);
 

@@ -114,6 +114,8 @@ contract PositionsPOLHandler is
     /// @param _rewardVaults The reward vault addresses.
     function removeRewardVaults(address[] calldata _rewardVaults) external onlyRole(DEFAULT_ADMIN_ROLE) {
         for (uint256 i; i < _rewardVaults.length; ++i) {
+            if (IBerachainRewardsVault(_rewardVaults[i]).balanceOf(address(this)) > 0) continue;
+
             rewardVaults.remove(_rewardVaults[i]);
             delete rewardVaultInfo[_rewardVaults[i]];
 
@@ -187,6 +189,7 @@ contract PositionsPOLHandler is
         address vault = address(uint160(_withdrawData.poolOrVault));
 
         _checkIfRewardVaultExists(vault);
+        _updateReward(vault, _withdrawData.tokenId);
 
         RewardVaultInfo memory rewardVaultData = rewardVaultInfo[vault];
         uint256 amount = _withdrawData.amount;
