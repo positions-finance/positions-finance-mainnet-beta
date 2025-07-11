@@ -79,7 +79,6 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
 
     address public relayer;
     address public lendingPool;
-    address public oracle;
     address public islandRouter;
     address public island;
     address public vault;
@@ -105,7 +104,6 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
     function initialize(
         address _admin,
         address _positionsRelayer,
-        address _priceOracle,
         address _lendingPool,
         address _islandRouter,
         address _island,
@@ -120,7 +118,6 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
         relayer = _positionsRelayer;
-        oracle = _priceOracle;
         lendingPool = _lendingPool;
         islandRouter = _islandRouter;
         island = _island;
@@ -207,6 +204,7 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         ) / positionData[positionRequestData.tokenId][positionRequestData.token].borrowIndexSnapshot;
 
         _updateReward(vault, positionRequestData.tokenId);
+        IERC20(island).approve(vault, lpTokens);
         IBerachainRewardsVault(vault).stake(lpTokens);
 
         positionData[positionRequestData.tokenId][positionRequestData.token].lpTokens += lpTokens;
@@ -268,6 +266,9 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         positionData[_params.tokenId][_params.token].amount = amountWithInterest;
         positionData[_params.tokenId][_params.token].borrowIndexSnapshot = currentBorrowIndex;
 
+        uint256 balance = IERC20(_params.token).balanceOf(address(this));
+        if (balance > 0) IERC20(_params.token).safeTransfer(msg.sender, balance);
+
         emit PositionClosed(msg.sender, _params.tokenId, _params.token);
     }
 
@@ -278,7 +279,7 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         _validateNFTOwnership(_tokenId, _proof);
         address receiver = msg.sender;
 
-        IBerachainRewardsVault(vault).getReward(address(this));
+        IBerachainRewardsVault(vault).getReward(address(this), address(this));
 
         uint256 earnedAmount = earned(vault, _tokenId);
 
@@ -338,5 +339,5 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         return IBerachainRewardsVault(_rewardVault).rewardPerToken();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

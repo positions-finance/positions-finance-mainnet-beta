@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.19;
 
-import { IStakingRewards } from "./IStakingRewards.sol";
+import {IStakingRewards} from "./IStakingRewards.sol";
 
 // interface IBerachainRewardVaults {
 //     function stake(uint256 amount) external;
@@ -160,7 +160,7 @@ interface IBerachainRewardsVault is IStakingRewards {
     /// @dev Callable by the operator or the account holder.
     /// @param account The account to get the reward for.
     /// @return The amount of the reward claimed.
-    function getReward(address account) external returns (uint256);
+    function getReward(address account, address) external returns (uint256);
 
     /// @notice Stake tokens in the vault.
     /// @param amount The amount of tokens to stake.

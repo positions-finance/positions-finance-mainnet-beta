@@ -48,7 +48,7 @@ abstract contract PositionsBGTHandler is Initializable {
      */
     function claimReward(address[] calldata _rewardVaults) external {
         for (uint256 i; i < _rewardVaults.length; i++) {
-            IBerachainRewardsVault(_rewardVaults[i]).getReward(address(this));
+            IBerachainRewardsVault(_rewardVaults[i]).getReward(address(this), address(this));
         }
     }
 

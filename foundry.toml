@@ -8,6 +8,6 @@ solc_version = "0.8.22"
 forge-std = "1.9.7"
 "@openzeppelin-contracts" = "5.3.0"
 "@openzeppelin-contracts-upgradeable" = "5.3.0"
-openzeppelin-foundry-upgrades = "0.4.0"
+openzeppelin-foundry-upgrades = { version = "0.4.0", git = "https://github.com/ericglau/openzeppelin-foundry-upgrades/", tag = "v0.4.8" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

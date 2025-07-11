@@ -270,7 +270,7 @@ contract PositionsPOLHandler is
                 continue;
             }
 
-            IBerachainRewardsVault(_rewardVault).getReward(address(this));
+            IBerachainRewardsVault(_rewardVault).getReward(address(this), address(this));
 
             uint256 earnedAmount = earned(_rewardVault, _tokenId);
 
