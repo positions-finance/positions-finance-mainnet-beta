@@ -330,7 +330,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         lenderInfo.depositAmount = lenderInfo.depositAmount + accruedInterest - _amount;
         lenderInfo.supplyIndexSnapshot = lendingPoolData.supplyIndex;
 
-        lendingPoolData.totalLent -= ((withdrawAmount * E27) / lendingPoolData.supplyIndex);
+        lendingPoolData.totalLent -= _amount;
 
         IERC20(_asset).safeTransfer(_to, withdrawAmount);
 
@@ -463,10 +463,12 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
                     - _lendingPoolData.totalLent
             ) * reserveFactor
         ) / BPS;
+        uint256 treasurySupplyInterest =
+            _calculateAccruedLenderInterest(_lendingPoolData, userToAssetToLendingInfo[treasury][_asset]);
 
-        userToAssetToLendingInfo[treasury][_asset].depositAmount += interestCutForTreasury;
+        userToAssetToLendingInfo[treasury][_asset].depositAmount += interestCutForTreasury + treasurySupplyInterest;
         userToAssetToLendingInfo[treasury][_asset].supplyIndexSnapshot = updatedSupplyIndex;
-        _lendingPoolData.totalLent += interestCutForTreasury;
+        _lendingPoolData.totalLent += interestCutForTreasury + treasurySupplyInterest;
 
         _lendingPoolData.supplyIndex = updatedSupplyIndex;
         _lendingPoolData.borrowIndex = updatedBorrowIndex;

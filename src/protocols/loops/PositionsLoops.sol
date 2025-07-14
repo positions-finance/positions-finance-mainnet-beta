@@ -174,10 +174,12 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         }
     }
 
-    function openLeveragedPosition(bytes32 _requestId) external {
+    function openLeveragedPosition(bytes32 _requestId, bytes32[] memory _proof) external {
         RequestData memory positionRequestData = requestData[_requestId];
 
         if (positionRequestData.status != Status.ACCEPTED) revert PositionsLoops__UnacceptedRequest(_requestId);
+
+        _validateNFTOwnership(positionRequestData.tokenId, _proof);
 
         PositionsLendingPool(lendingPool).borrowForLoops(positionRequestData.token, positionRequestData.amount);
 
@@ -213,6 +215,15 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         positionData[positionRequestData.tokenId][positionRequestData.token].borrowIndexSnapshot =
             PositionsLendingPool(lendingPool).getReserveData(positionRequestData.token).borrowIndex;
 
+        uint256 balance = IERC20(positionRequestData.token).balanceOf(address(this));
+        if (balance > 0) IERC20(positionRequestData.token).transfer(msg.sender, balance);
+
+        address otherToken = positionRequestData.token == address(IKodiakIsland(island).token0())
+            ? address(IKodiakIsland(island).token1())
+            : address(IKodiakIsland(island).token0());
+        balance = IERC20(otherToken).balanceOf(address(this));
+        if (balance > 0) IERC20(otherToken).transfer(msg.sender, balance);
+
         emit PositionOpened(msg.sender, _requestId, positionRequestData);
     }
 
@@ -243,7 +254,7 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
                 tokenIn: otherToken,
                 tokenOut: _params.token,
                 fee: _params.fee,
-                recipient: msg.sender,
+                recipient: address(this),
                 deadline: _params.deadline,
                 amountIn: amount,
                 amountOutMinimum: _params.amountOtherTokenMin,
@@ -325,7 +336,7 @@ contract PositionsLoops is Initializable, UUPSUpgradeable, AccessControlUpgradea
         PositionData storage info = positionData[_tokenId][_rewardVault];
 
         (uint256 balance, uint256 unclaimedReward, uint256 rewardsPerTokenPaid) =
-            (info.amount, info.unclaimedReward, info.rewardsPerTokenPaid);
+            (info.lpTokens, info.unclaimedReward, info.rewardsPerTokenPaid);
         uint256 rewardPerTokenDelta;
         unchecked {
             rewardPerTokenDelta = rewardPerToken(_rewardVault) - rewardsPerTokenPaid;
