@@ -78,7 +78,11 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
 
         (,, uint256 supplyIndex,,,) = IPositionsLendingPool(lendingPool).poolData(_token);
 
-        positions[_tokenId][_token] = Position({depositAmount: _amount, supplyIndexSnapshot: supplyIndex});
+        uint256 amountWithInterest =
+            (supplyIndex * positions[_tokenId][_token].depositAmount) / positions[_tokenId][_token].supplyIndexSnapshot;
+
+        positions[_tokenId][_token].depositAmount = amountWithInterest + _amount;
+        positions[_tokenId][_token].supplyIndexSnapshot = supplyIndex;
     }
 
     /// @notice Queues tokens for withdrawal from the lending pool.
