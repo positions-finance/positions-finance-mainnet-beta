@@ -14,6 +14,8 @@ import {IBerachainRewardsVault} from "../../interfaces/handlers/pol/IBerachainRe
 import {IPositionsPOLHandler} from "../../interfaces/handlers/pol/IPositionsPOLHandler.sol";
 import {IPositionsVaultsEntrypoint} from "../../interfaces/entryPoint/IPositionsVaultsEntrypoint.sol";
 import {IPositionsRelayer} from "./../../interfaces/poc/IPositionsRelayer.sol";
+import {IInfrared} from "../../interfaces/handlers/infrared/IInfrared.sol";
+import {IPriceOracle} from "../../interfaces/oracle/IPriceOracle.sol";
 
 import {UserVaultBalance} from "../../utils/PositionsDataProvider.sol";
 import {PositionsBGTHandler} from "./PositionsBGTHandler.sol";
@@ -41,6 +43,10 @@ contract PositionsPOLHandler is
     address public relayer;
     /// @notice The positions vaults entrypoint.
     address public entrypoint;
+    /// @notice The infrared contract address.
+    address public infrared;
+    /// @notice The oracle address.
+    address public oracle;
     /// @dev A set of supported reward vaults.
     EnumerableSet.AddressSet private rewardVaults;
     /// @notice Mapping to store reward vault data.
@@ -56,14 +62,20 @@ contract PositionsPOLHandler is
 
     /// @notice Initializes the contract.
     /// @param _entryPoint The vaults entrypoint address.
+    /// @param _infrared The infrared contract address.
     /// @param _admin The admin address.
     /// @param _upgrader The upgrader address which receives the upgrader role.
     /// @param _relayer The positions relayer address.
     /// @param _bgt The BGT token address.
-    function initialize(address _entryPoint, address _admin, address _upgrader, address _relayer, address _bgt)
-        public
-        initializer
-    {
+    function initialize(
+        address _entryPoint,
+        address _infrared,
+        address _oracle,
+        address _admin,
+        address _upgrader,
+        address _relayer,
+        address _bgt
+    ) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
         __PositionsBGTHandler_init(_bgt);
@@ -73,6 +85,8 @@ contract PositionsPOLHandler is
 
         relayer = _relayer;
         entrypoint = _entryPoint;
+        infrared = _infrared;
+        oracle = _oracle;
     }
 
     /// @notice Admin-only function to set the new relayer address.
@@ -91,6 +105,22 @@ contract PositionsPOLHandler is
         emit EntrypointSet(_newEntrypoint);
     }
 
+    /// @notice Allows the admin to set the new infrared contract address.
+    /// @param _newInfrared The new infrared contract address.
+    function setInfrared(address _newInfrared) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        infrared = _newInfrared;
+
+        emit InfraredSet(_newInfrared);
+    }
+
+    /// @notice Allows the admin to set the new infrared contract address.
+    /// @param _newOracle The new infrared contract address.
+    function setOracle(address _newOracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        oracle = _newOracle;
+
+        emit OracleSet(_newOracle);
+    }
+
     /// @notice Admin-only function to support new reward vaults.
     /// @param _rewardVaults The reward vault addresses.
     /// @param _rewardVaultInfos The reward vault data.
@@ -105,6 +135,7 @@ contract PositionsPOLHandler is
         for (uint256 i; i < _rewardVaults.length; ++i) {
             rewardVaultInfo[_rewardVaults[i]] = _rewardVaultInfos[i];
             rewardVaults.add(_rewardVaults[i]);
+            IBerachainRewardsVault(_rewardVaults[i]).setOperator(infrared);
 
             emit RewardVaultAdded(_rewardVaults[i], _rewardVaultInfos[i]);
         }
@@ -258,7 +289,7 @@ contract PositionsPOLHandler is
     /// @param _rewardVaults The reward vault addresses.
     /// @param _tokenId The user's nft tokenId.
     /// @param _proof The merkle proof to verify Nft tokenId ownership.
-    function redeemBGTForBera(address[] calldata _rewardVaults, uint256 _tokenId, bytes32[] calldata _proof) external {
+    function redeemBGTForIBGT(address[] calldata _rewardVaults, uint256 _tokenId, bytes32[] calldata _proof) external {
         if (operators[_tokenId] != msg.sender) _validateNFTOwnership(_tokenId, _proof);
         address receiver = msg.sender;
 
@@ -273,7 +304,7 @@ contract PositionsPOLHandler is
                 continue;
             }
 
-            IBerachainRewardsVault(_rewardVault).getReward(address(this), address(this));
+            IInfrared(infrared).claimExternalVaultRewards(rewardVaultInfo[_rewardVault].stakingToken, address(this));
 
             uint256 earnedAmount = earned(_rewardVault, _tokenId);
 
@@ -287,21 +318,17 @@ contract PositionsPOLHandler is
             }
         }
 
-        if (address(this).balance < totalRedeemAmount) {
-            _redeemBGTForBera();
+        IERC20 ibgt = IERC20(IInfrared(infrared).ibgt());
+        uint256 ibgtRedeemAmount = (totalRedeemAmount * IPriceOracle(oracle).getPrice(address(ibgt)))
+            / IPriceOracle(oracle).getPrice(address(address(0)));
+
+        if (ibgt.balanceOf(address(this)) < ibgtRedeemAmount) {
+            revert PositionsPOLHandler__ReedeemFailed();
         }
 
-        if (address(this).balance < totalRedeemAmount) {
-            revert PositionsBGTHandler__RedeemBGTForBeraFailed(receiver, _tokenId, totalRedeemAmount);
-        }
+        ibgt.safeTransfer(receiver, ibgtRedeemAmount);
 
-        (bool success,) = receiver.call{value: totalRedeemAmount}("");
-
-        if (!success) {
-            revert PositionsBGTHandler__RedeemBGTForBeraFailed(receiver, _tokenId, totalRedeemAmount);
-        }
-
-        emit RedeemBGTForBera(receiver, _tokenId, totalRedeemAmount);
+        emit RedeemBGTForIBGT(receiver, _tokenId, ibgtRedeemAmount);
     }
 
     function _updateReward(address _rewardVault, uint256 _tokenId) internal {

@@ -20,7 +20,9 @@ interface IPositionsPOLHandler {
 
     event RelayerSet(address indexed newRelayer);
     event EntrypointSet(address indexed newEntrypoint);
-    event RedeemBGTForBera(address indexed sender, uint256 tokenId, uint256 amount);
+    event InfraredSet(address indexed newInfrared);
+    event OracleSet(address indexed newOracle);
+    event RedeemBGTForIBGT(address indexed sender, uint256 tokenId, uint256 amount);
     event RewardVaultAdded(address indexed rewardVault, RewardVaultInfo rewardVaultInfo);
     event RewardVaultRemoved(address indexed rewardVault);
     event OperatorSet(uint256 indexed tokenId, address indexed operator);
@@ -31,6 +33,7 @@ interface IPositionsPOLHandler {
     error PositionsPOLHandler__InsufficientBalance(uint256 tokenId, uint256 positionBalance, uint256 withdrawalAmount);
     error PositionsPOLHandler__NFTOwnershipVerificationFailed(address user, uint256 tokenId);
     error PositionsPOLHandler__RewardVaultDoesNotExist();
+    error PositionsPOLHandler__ReedeemFailed();
 
     function addRewardVaults(address[] calldata _rewardVaults, RewardVaultInfo[] calldata _rewardVaultInfos) external;
     function removeRewardVaults(address[] calldata _rewardVaults) external;
