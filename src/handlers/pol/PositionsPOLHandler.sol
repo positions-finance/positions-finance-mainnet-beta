@@ -19,6 +19,7 @@ import {IPriceOracle} from "../../interfaces/oracle/IPriceOracle.sol";
 
 import {UserVaultBalance} from "../../utils/PositionsDataProvider.sol";
 import {PositionsBGTHandler} from "./PositionsBGTHandler.sol";
+import {Utils} from "../../utils/Utils.sol";
 
 /// @title PositionsPOLHandler.
 /// @author Positions Team.
@@ -38,6 +39,12 @@ contract PositionsPOLHandler is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     /// @notice Pricesion for BGT.
     uint256 internal constant PRECISION = 1e18;
+    uint16 private constant BPS = 1e4;
+
+    /// @notice The recipient of the fee charged on rewards accumuulated for users.
+    address public rewardFeeRecipient;
+    /// @notice Percentage of reward accumulated for users that is to be directed to the protocol.
+    uint16 public rewardCut;
 
     /// @notice The positions relayer contract address.
     address public relayer;
@@ -69,6 +76,8 @@ contract PositionsPOLHandler is
     /// @param _bgt The BGT token address.
     function initialize(
         address _entryPoint,
+        address _recipient,
+        uint16 _rewardCut,
         address _infrared,
         address _oracle,
         address _admin,
@@ -83,6 +92,8 @@ contract PositionsPOLHandler is
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _upgrader);
 
+        rewardFeeRecipient = _recipient;
+        rewardCut = _rewardCut;
         relayer = _relayer;
         entrypoint = _entryPoint;
         infrared = _infrared;
@@ -103,6 +114,17 @@ contract PositionsPOLHandler is
         entrypoint = _newEntrypoint;
 
         emit EntrypointSet(_newEntrypoint);
+    }
+
+    function setRewardFeeDetails(address _recipient, uint16 _rewardCut) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        Utils.requireNotAddressZero(_recipient);
+        Utils.requireNotValueZero(_rewardCut);
+        if (_rewardCut > BPS) revert MaxFeeExceeded();
+
+        rewardFeeRecipient = _recipient;
+        rewardCut = _rewardCut;
+
+        emit RewardFeeDetailsSet(_recipient, _rewardCut);
     }
 
     /// @notice Allows the admin to set the new infrared contract address.
@@ -326,7 +348,10 @@ contract PositionsPOLHandler is
             revert PositionsPOLHandler__ReedeemFailed();
         }
 
-        ibgt.safeTransfer(receiver, ibgtRedeemAmount);
+        uint256 protocolCut = (ibgtRedeemAmount * rewardCut) / BPS;
+
+        ibgt.safeTransfer(receiver, ibgtRedeemAmount - protocolCut);
+        ibgt.safeTransfer(rewardFeeRecipient, protocolCut);
 
         emit RedeemBGTForIBGT(receiver, _tokenId, ibgtRedeemAmount);
     }

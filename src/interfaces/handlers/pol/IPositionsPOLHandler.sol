@@ -26,6 +26,7 @@ interface IPositionsPOLHandler {
     event RewardVaultAdded(address indexed rewardVault, RewardVaultInfo rewardVaultInfo);
     event RewardVaultRemoved(address indexed rewardVault);
     event OperatorSet(uint256 indexed tokenId, address indexed operator);
+    event RewardFeeDetailsSet(address indexed recipient, uint16 indexed rewardCut);
 
     error PositionsPOLHandler__NotEntryPoint();
     error PositionsPOLHandler__ArrayLengthMismatch();
@@ -34,6 +35,7 @@ interface IPositionsPOLHandler {
     error PositionsPOLHandler__NFTOwnershipVerificationFailed(address user, uint256 tokenId);
     error PositionsPOLHandler__RewardVaultDoesNotExist();
     error PositionsPOLHandler__ReedeemFailed();
+    error MaxFeeExceeded();
 
     function addRewardVaults(address[] calldata _rewardVaults, RewardVaultInfo[] calldata _rewardVaultInfos) external;
     function removeRewardVaults(address[] calldata _rewardVaults) external;

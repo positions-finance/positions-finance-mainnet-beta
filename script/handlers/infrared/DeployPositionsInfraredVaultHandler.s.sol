@@ -24,10 +24,11 @@ contract DeployPositionsInfraredVaultHandler is Script {
                 PositionsInfraredVaultHandler.initialize,
                 (
                     networkConfig.admin,
+                    networkConfig.admin,
+                    networkConfig.rewardFee,
                     networkConfig.upgrader,
                     networkConfig.entryPoint,
-                    networkConfig.relayer,
-                    networkConfig.oracle
+                    networkConfig.relayer
                 )
             ),
             opts

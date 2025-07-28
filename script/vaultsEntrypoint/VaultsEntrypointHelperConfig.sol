@@ -48,7 +48,7 @@ contract VaultsEntrypointHelperConfig is Script, ChainIds {
         return NetworkConfig({
             admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             upgrader: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
-            relayer: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF
+            relayer: 0x7477a2fb34180486D36B5aBDfa59136bCA061C17
         });
     }
 

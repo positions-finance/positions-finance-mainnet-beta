@@ -24,6 +24,10 @@ contract DeployPOLHandler is Script {
                             PositionsPOLHandler.initialize.selector,
                             config.entrypoint,
                             config.admin,
+                            config.rewardFee,
+                            config.infrared,
+                            config.oracle,
+                            config.admin,
                             config.upgrader,
                             config.relayer,
                             config.bgt

@@ -31,18 +31,18 @@ contract DeployPositionsLendingPool is Script {
             opts
         );
 
-        for (uint256 i; i < config.assets.length; ++i) {
-            PositionsLendingPool(proxy).createLendingPool(
-                config.assets[i],
-                // placeholder irm
-                PositionsLendingPool.InterestRateModel({
-                    baseRate: 2e25,
-                    slope1: 5e25,
-                    slope2: 4e26,
-                    optimalUtilization: 9e26
-                })
-            );
-        }
+        // for (uint256 i; i < config.assets.length; ++i) {
+        //     PositionsLendingPool(proxy).createLendingPool(
+        //         config.assets[i],
+        //         // placeholder irm
+        //         PositionsLendingPool.InterestRateModel({
+        //             baseRate: 2e25,
+        //             slope1: 5e25,
+        //             slope2: 4e26,
+        //             optimalUtilization: 9e26
+        //         })
+        //     );
+        // }
 
         vm.stopBroadcast();
 

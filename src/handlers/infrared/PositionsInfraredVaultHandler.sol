@@ -36,11 +36,14 @@ contract PositionsInfraredVaultHandler is
 
     /// @notice The upgrader role can upgrade the proxy to a new implementation.
     bytes32 private constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    uint16 private constant BPS = 1e4;
 
+    /// @notice The recipient of the fee charged on rewards accumuulated for users.
+    address public rewardFeeRecipient;
+    /// @notice Percentage of reward accumulated for users that is to be directed to the protocol.
+    uint16 public rewardCut;
     /// @notice The positions vaults entry point contract address.
     address private s_entryPoint;
-    /// @dev The price oracle to fetch token prices from.
-    address private s_oracle;
     /// @dev The relayer address.
     address private s_relayer;
     /// @dev A set of supported infrared vaults.
@@ -57,20 +60,35 @@ contract PositionsInfraredVaultHandler is
     /// @param _admin The admin address.
     /// @param _upgrader The upgrader address which receives the upgrader role.
     /// @param _entryPoint The positions vaults entry point contract address.
-    /// @param _oracle The oracle contract address.
-    function initialize(address _admin, address _upgrader, address _entryPoint, address _relayer, address _oracle)
-        public
-        initializer
-    {
+    function initialize(
+        address _admin,
+        address _feeRecipient,
+        uint16 _rewardCut,
+        address _upgrader,
+        address _entryPoint,
+        address _relayer
+    ) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _upgrader);
 
+        rewardFeeRecipient = _feeRecipient;
+        rewardCut = _rewardCut;
         s_entryPoint = _entryPoint;
         s_relayer = _relayer;
-        s_oracle = _oracle;
+    }
+
+    function setRewardFeeDetails(address _recipient, uint16 _rewardCut) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        Utils.requireNotAddressZero(_recipient);
+        Utils.requireNotValueZero(_rewardCut);
+        if (_rewardCut > BPS) revert MaxFeeExceeded();
+
+        rewardFeeRecipient = _recipient;
+        rewardCut = _rewardCut;
+
+        emit RewardFeeDetailsSet(_recipient, _rewardCut);
     }
 
     /// @notice Allows the admin to set the new entry point contract address.
@@ -91,16 +109,6 @@ contract PositionsInfraredVaultHandler is
         s_relayer = _newRelayer;
 
         emit RelayerSet(_newRelayer);
-    }
-
-    /// @notice Allows the admin to set the new oracle contract address.
-    /// @param _newOracle The new oracle contract address.
-    function setOracle(address _newOracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        Utils.requireNotAddressZero(_newOracle);
-
-        s_oracle = _newOracle;
-
-        emit OracleSet(_newOracle);
     }
 
     /// @notice Admin-only function to support new infrared vaults.
@@ -300,7 +308,9 @@ contract PositionsInfraredVaultHandler is
                 if (IERC20(rewardTokens[j]).balanceOf(address(this)) < earnedAmount) {
                     IMultiRewards(_infraredVaults[i]).getReward();
                 }
-                IERC20(rewardTokens[j]).safeTransfer(_receiver, earnedAmount);
+                uint256 protocolCut = (earnedAmount * rewardCut) / BPS;
+                IERC20(rewardTokens[j]).safeTransfer(_receiver, earnedAmount - protocolCut);
+                IERC20(rewardTokens[j]).safeTransfer(rewardFeeRecipient, protocolCut);
             }
         }
     }
@@ -362,12 +372,6 @@ contract PositionsInfraredVaultHandler is
     /// @return The relayer contract address.
     function getRelayer() external view returns (address) {
         return s_relayer;
-    }
-
-    /// @notice Gets the oracle contract address.
-    /// @return The oracle contract address.
-    function getOracle() external view returns (address) {
-        return s_oracle;
     }
 
     /// @notice Gets a set of supported infrared vaults.

@@ -40,7 +40,7 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
     /// @notice Initializes the proxy.
     /// @param _admin The initial admin.
     function initialize(address _admin) public initializer {
-        __ERC721_init("PositionsNFT", "PNFT");
+        __ERC721_init("Positions' PoC", "PoC");
         __UUPSUpgradeable_init();
         __AccessControl_init();
 
@@ -99,6 +99,10 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
 
         lastTransferTimestamp[_tokenId] = block.timestamp;
         super.safeTransferFrom(_from, _to, _tokenId, _data);
+    }
+
+    function _baseURI() internal pure override returns (string memory) {
+        return "https://consumers.positions.finance/mint/metadata/";
     }
 
     /// @notice Overriding the UUPS Upgrade authorization to only allow the default admin to upgrade the proxy implementation.

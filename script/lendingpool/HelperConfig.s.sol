@@ -186,7 +186,7 @@ contract HelperConfigLendingPool is Script {
 
         return NetworkConfig({
             admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
-            positionsRelayer: 0xce055Da993a40405C42CA22BbcEF056f94fEB4bB, // placeholder, change on each run
+            positionsRelayer: 0x7477a2fb34180486D36B5aBDfa59136bCA061C17, // placeholder, change on each run
             initialReserveFactor: 1e3,
             assets: assets,
             oracle: 0xEc46dD85dc81eA631B29178F6Db0e1Bc135E7D2B

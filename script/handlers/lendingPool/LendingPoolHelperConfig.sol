@@ -47,10 +47,10 @@ contract LendingPoolHelperConfig is Script, ChainIds {
 
     function _getBerachainConfig() private pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            entrypoint: 0x48bd18FD6c1415DfDCC34abd8CcCB50A6ABca40e,
+            entrypoint: 0x197DaBDa06FeB7681DB97D98db0fCa1ba9402004,
             admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             upgrader: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
-            lendingPool: 0x51B2C76d0259078d8D1a4fb7c844D72D30Dd1420
+            lendingPool: 0x501eB689C59c9B577896bcAbcC92bf6926d0B968
         });
     }
 
