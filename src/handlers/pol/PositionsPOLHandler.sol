@@ -342,7 +342,7 @@ contract PositionsPOLHandler is
 
         IERC20 ibgt = IERC20(IInfrared(infrared).ibgt());
         uint256 ibgtRedeemAmount = (totalRedeemAmount * IPriceOracle(oracle).getPrice(address(ibgt)))
-            / IPriceOracle(oracle).getPrice(address(address(0)));
+            / IPriceOracle(oracle).getPrice(rewardVaultInfo[_rewardVaults[0]].rewardToken);
 
         if (ibgt.balanceOf(address(this)) < ibgtRedeemAmount) {
             revert PositionsPOLHandler__ReedeemFailed();

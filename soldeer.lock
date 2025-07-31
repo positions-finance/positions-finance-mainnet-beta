@@ -13,6 +13,13 @@ checksum = "4bd92f87af0cac7226b12ce367e7327f13431735fa6010508d8c8177f9d3d10f"
 integrity = "fa195a69ef4dfec7fec7fbbb77f424258c821832fdd355b0a6e5fe34d2986a16"
 
 [[dependencies]]
+name = "@pythnetwork-pyth-sdk-solidity"
+version = "4.2.0"
+url = "https://soldeer-revisions.s3.amazonaws.com/@pythnetwork-pyth-sdk-solidity/4_2_0_07-07-2025_06:55:20_pyth-sdk-solidity.zip"
+checksum = "b5b9185477e02697939242543724f652ff29f11f924d1d08eacfab44134e6f9a"
+integrity = "2ffdc0f97dbf7b04c405bae71e29bad0566aef4b14b5e76cac59ab99002492a9"
+
+[[dependencies]]
 name = "forge-std"
 version = "1.9.7"
 url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_7_28-04-2025_15:55:08_forge-std-1.9.zip"

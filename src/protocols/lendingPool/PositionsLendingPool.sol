@@ -614,9 +614,11 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         uint256 totalBorrowedAmountInUsd;
 
         for (uint256 i; i < assets.length; ++i) {
-            totalBorrowedAmountInUsd += (
-                getborrowerDebt(assets[i], _tokenId) * IPriceOracle(priceOracle).getPrice(assets[i])
-            ) / 10 ** IERC20Metadata(assets[i]).decimals();
+            uint256 debt = getborrowerDebt(assets[i], _tokenId);
+            if (debt > 0) {
+                totalBorrowedAmountInUsd +=
+                    (debt * IPriceOracle(priceOracle).getPrice(assets[i])) / 10 ** IERC20Metadata(assets[i]).decimals();
+            }
         }
 
         return totalBorrowedAmountInUsd;
