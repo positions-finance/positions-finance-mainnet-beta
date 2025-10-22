@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC4626} from "@openzeppelin-contracts-5.3.0/token/ERC20/extensions/ERC4626.sol";
 
 import {UUPSUpgradeable} from "@openzeppelin-contracts-upgradeable-5.3.0/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin-contracts-upgradeable-5.3.0/proxy/utils/Initializable.sol";
@@ -61,6 +62,7 @@ contract PositionsPOLHandler is
     /// @dev Mapping to track user deposits in reward vaults.
     mapping(address underlyingVault => mapping(uint256 tokenId => PositionInfo)) private positionInfoMaps;
     mapping(uint256 tokenId => address operator) public operators;
+    address internal wiBgt;
 
     modifier onlyEntryPoint() {
         if (msg.sender != entrypoint) revert PositionsPOLHandler__NotEntryPoint();
@@ -83,7 +85,8 @@ contract PositionsPOLHandler is
         address _admin,
         address _upgrader,
         address _relayer,
-        address _bgt
+        address _bgt,
+        address _wiBgt
     ) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
@@ -98,6 +101,7 @@ contract PositionsPOLHandler is
         entrypoint = _entryPoint;
         infrared = _infrared;
         oracle = _oracle;
+        wiBgt = _wiBgt;
     }
 
     /// @notice Admin-only function to set the new relayer address.
@@ -339,6 +343,8 @@ contract PositionsPOLHandler is
                 ++i;
             }
         }
+
+        IERC4626(wiBgt).redeem(totalRedeemAmount, rewardFeeRecipient, address(this));
 
         IERC20 ibgt = IERC20(IInfrared(infrared).ibgt());
         uint256 ibgtRedeemAmount = (totalRedeemAmount * IPriceOracle(oracle).getPrice(address(ibgt)))

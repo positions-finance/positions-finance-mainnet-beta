@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin-contracts-5.3.0/token/ERC20/IERC20.sol";
+import {IERC4626} from "@openzeppelin-contracts-5.3.0/token/ERC20/extensions/ERC4626.sol";
 import {IERC20Metadata} from "@openzeppelin-contracts-5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC721} from "@openzeppelin-contracts-5.3.0/token/ERC721/IERC721.sol";
 
@@ -55,6 +56,7 @@ contract PositionsInfraredVaultHandler is
     /// @dev Mapping to track user deposits in infrared vaults.
     mapping(address infraredVault => mapping(uint256 tokenId => PositionInfo)) private s_positions;
     mapping(uint256 tokenId => address operator) public operators;
+    address internal s_wiBgt;
 
     /// @notice Initializes the contract.
     /// @param _admin The admin address.
@@ -66,7 +68,8 @@ contract PositionsInfraredVaultHandler is
         uint16 _rewardCut,
         address _upgrader,
         address _entryPoint,
-        address _relayer
+        address _relayer,
+        address _wiBgt
     ) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
@@ -78,6 +81,7 @@ contract PositionsInfraredVaultHandler is
         rewardCut = _rewardCut;
         s_entryPoint = _entryPoint;
         s_relayer = _relayer;
+        s_wiBgt = _wiBgt;
     }
 
     function setRewardFeeDetails(address _recipient, uint16 _rewardCut) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -309,8 +313,14 @@ contract PositionsInfraredVaultHandler is
                     IMultiRewards(_infraredVaults[i]).getReward();
                 }
                 uint256 protocolCut = (earnedAmount * rewardCut) / BPS;
-                IERC20(rewardTokens[j]).safeTransfer(_receiver, earnedAmount - protocolCut);
-                IERC20(rewardTokens[j]).safeTransfer(rewardFeeRecipient, protocolCut);
+
+                if (rewardTokens[j] == s_wiBgt) {
+                    IERC4626(s_wiBgt).redeem(earnedAmount - protocolCut, _receiver, address(this));
+                    IERC4626(s_wiBgt).redeem(protocolCut, rewardFeeRecipient, address(this));
+                } else {
+                    IERC20(rewardTokens[j]).safeTransfer(_receiver, earnedAmount - protocolCut);
+                    IERC20(rewardTokens[j]).safeTransfer(rewardFeeRecipient, protocolCut);
+                }
             }
         }
     }

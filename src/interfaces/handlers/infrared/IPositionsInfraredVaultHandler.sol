@@ -25,6 +25,7 @@ interface IPositionsInfraredVaultHandler is IHandler {
     event RelayerSet(address relayer);
     event OperatorSet(uint256 indexed tokenId, address indexed operator);
     event RewardFeeDetailsSet(address indexed recipient, uint16 indexed rewardCut);
+    event BatchClaimerSet(address indexed infraredBatchClaimer);
 
     error PositionsInfraredVaultHandler__InsufficientBalance(
         uint256 tokenId, uint256 positionBalance, uint256 withdrawalAmount
@@ -42,7 +43,8 @@ interface IPositionsInfraredVaultHandler is IHandler {
         uint16 _rewardCut,
         address _upgrader,
         address _entryPoint,
-        address _poc
+        address _poc,
+        address _wiBgt
     ) external;
     function setEntrypoint(address _newEntryPoint) external;
     function setRelayer(address _newRelayer) external;
