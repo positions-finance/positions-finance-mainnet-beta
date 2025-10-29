@@ -15,24 +15,27 @@ contract DeployPositionsLendingPoolHandler is Script {
         vm.startBroadcast();
         PositionsLendingPoolHandler lendingPoolHandler = new PositionsLendingPoolHandler();
 
-        PositionsLendingPoolHandler proxy = PositionsLendingPoolHandler(
-            payable(
-                address(
-                    new ERC1967Proxy(
-                        address(lendingPoolHandler),
-                        abi.encodeWithSelector(
-                            PositionsLendingPoolHandler.initialize.selector,
-                            config.entrypoint,
-                            config.lendingPool,
-                            config.admin,
-                            config.upgrader
-                        )
-                    )
-                )
-            )
+        // PositionsLendingPoolHandler proxy = PositionsLendingPoolHandler(
+        //     payable(
+        //         address(
+        //             new ERC1967Proxy(
+        //                 address(lendingPoolHandler),
+        //                 abi.encodeWithSelector(
+        //                     PositionsLendingPoolHandler.initialize.selector,
+        //                     config.entrypoint,
+        //                     config.lendingPool,
+        //                     config.admin,
+        //                     config.upgrader
+        //                 )
+        //             )
+        //         )
+        //     )
+        // );
+        PositionsLendingPoolHandler(0x4Bd56467763F14072beB4A7eE409a77625f4f319).upgradeToAndCall(
+            address(new PositionsLendingPoolHandler()), ""
         );
         vm.stopBroadcast();
 
-        return (proxy);
+        // return (proxy);
     }
 }

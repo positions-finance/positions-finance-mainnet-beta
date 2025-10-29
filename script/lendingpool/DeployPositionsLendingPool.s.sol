@@ -22,31 +22,32 @@ contract DeployPositionsLendingPool is Script {
 
         vm.startBroadcast();
 
-        address proxy = Upgrades.deployUUPSProxy(
-            "PositionsLendingPool.sol",
-            abi.encodeCall(
-                PositionsLendingPool.initialize,
-                (config.admin, config.positionsRelayer, config.oracle, config.initialReserveFactor)
-            ),
-            opts
-        );
+        // address proxy = Upgrades.deployUUPSProxy(
+        //     "PositionsLendingPool.sol",
+        //     abi.encodeCall(
+        //         PositionsLendingPool.initialize,
+        //         (config.admin, config.positionsRelayer, config.oracle, config.initialReserveFactor)
+        //     ),
+        //     opts
+        // );
+        // PositionsLendingPool(0x501eB689C59c9B577896bcAbcC92bf6926d0B968).utilization(3);
 
         // for (uint256 i; i < config.assets.length; ++i) {
-        //     PositionsLendingPool(proxy).createLendingPool(
-        //         config.assets[i],
-        //         // placeholder irm
-        //         PositionsLendingPool.InterestRateModel({
-        //             baseRate: 2e25,
-        //             slope1: 5e25,
-        //             slope2: 4e26,
-        //             optimalUtilization: 9e26
-        //         })
-        //     );
+        PositionsLendingPool(0x501eB689C59c9B577896bcAbcC92bf6926d0B968).createLendingPool(
+            0xDeadf18CB9233770FE8874c78D7483b4A126B34a,
+            // placeholder irm
+            PositionsLendingPool.InterestRateModel({
+                baseRate: 0,
+                slope1: 675000000000000000000000000,
+                slope2: 750000000000000000000000000,
+                optimalUtilization: 750000000000000000000000000
+            })
+        );
         // }
 
         vm.stopBroadcast();
 
-        return (helperConfig, PositionsLendingPool(proxy));
+        // return (helperConfig, PositionsLendingPool(proxy));
     }
 }
 
@@ -59,7 +60,7 @@ contract UpgradePositionsLendingPool is Script {
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
-        address proxy = 0x95454df4240cc7Eb1Aa2fc270241E4372114f71C;
+        address proxy = 0x501eB689C59c9B577896bcAbcC92bf6926d0B968;
 
         vm.startBroadcast();
 

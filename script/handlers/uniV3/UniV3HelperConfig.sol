@@ -49,7 +49,7 @@ contract UniV3HelperConfig is Script, ChainIds {
 
     function _getArbitrumConfig() private pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            relayer: 0xB8fba279f495f92A2D8410543A247862a8856ae1,
+            relayer: 0xf650d13f3C0E332b63fb528D9f49506Ab37dD4B8,
             nonFungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             upgrader: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF
