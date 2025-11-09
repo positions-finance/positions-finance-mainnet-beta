@@ -150,6 +150,14 @@ contract PositionsInfraredVaultHandler is
         }
     }
 
+    function setWiBGT(address _wiBgt) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        Utils.requireNotAddressZero(_wiBgt);
+
+        s_wiBgt = _wiBgt;
+
+        IERC20(_wiBgt).approve(address(_wiBgt), type(uint256).max);
+    }
+
     function setOperator(uint256 _tokenId, bytes32[] memory _proof, address _operator) external {
         _validateNFTOwnership(_tokenId, _proof);
 

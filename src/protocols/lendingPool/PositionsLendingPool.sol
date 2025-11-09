@@ -105,8 +105,8 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// the requestId is removed.
     mapping(uint256 tokenId => mapping(address asset => EnumerableSet.Bytes32Set requestIds)) private
         userToAssetToRequestIds;
-    /// @notice The loops contract address.
-    address public loops;
+    /// @notice The loops contract addresses.
+    EnumerableSet.AddressSet internal loops;
 
     //////////////
     /// Events ///
@@ -142,7 +142,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     error LendingPoolDoesNotExist(PoolData lendingPoolData);
     error InsufficientBalance();
     error NotRelayer();
-    error NotLoops(address caller, address loops);
+    error NotLoops(address caller);
 
     /////////////////
     /// Modifiers ///
@@ -156,8 +156,8 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     }
 
     modifier onlyLoops() {
-        if (msg.sender != loops) {
-            revert NotLoops(msg.sender, loops);
+        if (!loops.contains(msg.sender)) {
+            revert NotLoops(msg.sender);
         }
         _;
     }
@@ -231,7 +231,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     function setLoops(address _loops) external onlyOwner {
         if (_loops == address(0)) revert AddressZero();
 
-        loops = _loops;
+        loops.add(_loops);
 
         emit LoopsSet(_loops);
     }
@@ -390,7 +390,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// @notice Borrows amount for loops.
     function borrowForLoops(address _token, uint256 _amount) external onlyLoops {
         PoolData storage lendingPoolData = poolData[_token];
-        BorrowerInfo storage borrowerInfo = tokenIdToAssetToBorrowInfo[uint256(uint160(loops))][_token];
+        BorrowerInfo storage borrowerInfo = tokenIdToAssetToBorrowInfo[uint256(uint160(msg.sender))][_token];
 
         if (_amount == 0) revert AmountZero();
         _revertIfLendingPoolDoesNotExist(lendingPoolData);
@@ -404,7 +404,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
 
         IERC20(_token).safeTransfer(msg.sender, _amount);
 
-        emit BorrowedForLoops(uint256(uint160(loops)), _token, _amount);
+        emit BorrowedForLoops(uint256(uint160(msg.sender)), _token, _amount);
     }
 
     /// @notice Allows anyone to repay debt amount for any valid borrow position.

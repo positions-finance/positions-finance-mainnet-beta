@@ -344,11 +344,11 @@ contract PositionsPOLHandler is
             }
         }
 
-        IERC4626(wiBgt).redeem(totalRedeemAmount, rewardFeeRecipient, address(this));
-
         IERC20 ibgt = IERC20(IInfrared(infrared).ibgt());
         uint256 ibgtRedeemAmount = (totalRedeemAmount * IPriceOracle(oracle).getPrice(address(ibgt)))
             / IPriceOracle(oracle).getPrice(rewardVaultInfo[_rewardVaults[0]].rewardToken);
+
+        IERC4626(wiBgt).redeem(ibgtRedeemAmount, address(this), address(this));
 
         if (ibgt.balanceOf(address(this)) < ibgtRedeemAmount) {
             revert PositionsPOLHandler__ReedeemFailed();
