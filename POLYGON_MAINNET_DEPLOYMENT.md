@@ -81,11 +81,94 @@ The core protocol functionality is fully operational on Polygon: the **Positions
 
 ## Post-Deployment Actions Required
 
-### 1. Create Lending Pools
-The admin (`0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e`) needs to create lending pools for each asset:
+The following actions must be performed by the **Admin** (`0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e`) using the admin's private key.
+
+### 1. Register Handlers with Entrypoint
+
+The admin must register both handlers with the VaultsEntrypoint contract using the `addHandler` function:
 
 ```bash
-# Using forge script with admin private key
+# Register LendingPoolHandler
+cast send 0x520986accba2115a9b63231ca062432e7926ec4a \
+  "addHandler(address)" \
+  0x5558400e4e160b1e34090bd13bcbb9b6ecc530f4 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+
+# Register UniV3Handler
+cast send 0x520986accba2115a9b63231ca062432e7926ec4a \
+  "addHandler(address)" \
+  0x426e583135d5ce0e4df631674c05f57218885054 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+```
+
+### 2. Configure Price Feeds in PriceOracle
+
+The admin must set Pyth price feed IDs for each supported asset using `setPythPriceId`. You can find Pyth price feed IDs at https://pyth.network/developers/price-feed-ids
+
+```bash
+# Set WETH price feed
+cast send 0x81a6169cb92ddcf41a264333b59a777a5351a1d1 \
+  "setPythPriceId(address,bytes32)" \
+  0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619 \
+  0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+
+# Set USDC price feed
+cast send 0x81a6169cb92ddcf41a264333b59a777a5351a1d1 \
+  "setPythPriceId(address,bytes32)" \
+  0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 \
+  0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+
+# Set USDT price feed
+cast send 0x81a6169cb92ddcf41a264333b59a777a5351a1d1 \
+  "setPythPriceId(address,bytes32)" \
+  0xc2132D05D31c914a87C6611C10748AEb04B58e8F \
+  0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+
+# Set WBTC price feed
+cast send 0x81a6169cb92ddcf41a264333b59a777a5351a1d1 \
+  "setPythPriceId(address,bytes32)" \
+  0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6 \
+  0xc9d8b075a5c69303365ae23633d4e085199bf5c520a3b90fed1322a0342ffc33 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+```
+
+**Pyth Price Feed IDs for Polygon Mainnet:**
+| Asset | Pyth Price Feed ID |
+|-------|-------------------|
+| ETH/USD | `0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace` |
+| USDC/USD | `0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a` |
+| USDT/USD | `0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b` |
+| BTC/USD | `0xc9d8b075a5c69303365ae23633d4e085199bf5c520a3b90fed1322a0342ffc33` |
+
+### 3. Set Staleness Thresholds (Optional but Recommended)
+
+Set staleness thresholds for each asset to define how old price data can be before it's considered stale:
+
+```bash
+# Set staleness threshold to 1 hour (3600 seconds) for each asset
+cast send 0x81a6169cb92ddcf41a264333b59a777a5351a1d1 \
+  "setStalenessThreshold(address,uint256)" \
+  <ASSET_ADDRESS> \
+  3600 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+```
+
+### 4. Create Lending Pools
+
+The admin must create lending pools for each supported asset:
+
+```bash
+# Using forge script
 forge script script/lendingpool/DeployPositionsLendingPool.s.sol:CreateLendingPool \
   --sig "run(address,address)" \
   0xb1a80401e961cedb4ff66ce28a6335fae8355521 \
@@ -93,27 +176,360 @@ forge script script/lendingpool/DeployPositionsLendingPool.s.sol:CreateLendingPo
   --rpc-url $POLYGON_MAINNET_RPC_URL \
   --broadcast \
   --private-key <ADMIN_PRIVATE_KEY>
+
+# Or using cast directly
+cast send 0xb1a80401e961cedb4ff66ce28a6335fae8355521 \
+  "createLendingPool(address,(uint256,uint256,uint256,uint256))" \
+  <ASSET_ADDRESS> \
+  "(0,675000000000000000000000000,750000000000000000000000000,750000000000000000000000000)" \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
 ```
 
-Assets to create pools for:
-- WETH: `0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619`
-- USDC: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`
-- USDT: `0xc2132D05D31c914a87C6611C10748AEb04B58e8F`
-- WBTC: `0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6`
+**Assets to create pools for:**
+| Asset | Address | Command |
+|-------|---------|---------|
+| WETH | `0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619` | Replace `<ASSET_ADDRESS>` above |
+| USDC | `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174` | Replace `<ASSET_ADDRESS>` above |
+| USDT | `0xc2132D05D31c914a87C6611C10748AEb04B58e8F` | Replace `<ASSET_ADDRESS>` above |
+| WBTC | `0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6` | Replace `<ASSET_ADDRESS>` above |
 
-### 2. Configure Price Feeds
-The operator needs to set up Pyth price feed IDs for each asset in the PriceOracle contract.
+**Interest Rate Model Parameters:**
+- `baseRate`: 0
+- `slope1`: 675000000000000000000000000 (67.5%)
+- `slope2`: 750000000000000000000000000 (75%)
+- `optimalUtilization`: 750000000000000000000000000 (75%)
 
-### 3. Register Handlers with Entrypoint
-The admin needs to register the handlers with the VaultsEntrypoint contract.
+### 5. Contract Verification on Polygonscan
 
-### 4. Contract Verification
-Verify contracts on Polygonscan using:
+Verify all contracts for transparency:
+
 ```bash
-forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> \
+# Get a Polygonscan API key from https://polygonscan.com/apis
+export POLYGONSCAN_API_KEY=your_api_key_here
+
+# Verify PriceOracle implementation
+forge verify-contract 0x33d92194d102b17d38bfea98c3c4160b3787abb1 \
+  src/oracle/PriceOracle.sol:PriceOracle \
   --chain-id 137 \
-  --etherscan-api-key <POLYGONSCAN_API_KEY>
+  --etherscan-api-key $POLYGONSCAN_API_KEY
+
+# Verify PositionsVaultsEntrypoint implementation
+forge verify-contract 0x7c2727f826dd110d7a8a2ce19c7b4d1fd9d66548 \
+  src/entryPoint/PositionsVaultsEntrypoint.sol:PositionsVaultsEntrypoint \
+  --chain-id 137 \
+  --etherscan-api-key $POLYGONSCAN_API_KEY
+
+# Verify PositionsLendingPool implementation
+forge verify-contract 0x65a8bed5d6a27739399a9f58c6305eb466b8d197 \
+  src/protocols/lendingPool/PositionsLendingPool.sol:PositionsLendingPool \
+  --chain-id 137 \
+  --etherscan-api-key $POLYGONSCAN_API_KEY
+
+# Verify PositionsLendingPoolHandler implementation
+forge verify-contract 0xe11fb0d76836f243838dce410333bb15de868ec0 \
+  src/handlers/lendingPool/PositionsLendingPoolHandler.sol:PositionsLendingPoolHandler \
+  --chain-id 137 \
+  --etherscan-api-key $POLYGONSCAN_API_KEY
+
+# Verify PositionsUniV3Handler implementation
+forge verify-contract 0x5bb0844984a92761b67c6b5b6efecc6e6ee4c5b5 \
+  src/handlers/uniV3/PositionsUniV3Handler.sol:PositionsUniV3Handler \
+  --chain-id 137 \
+  --etherscan-api-key $POLYGONSCAN_API_KEY
+
+# Verify PositionsDataProvider
+forge verify-contract 0x2e89f4b127b1db8d5c23328d09f2ac6ff0c5484e \
+  src/utils/PositionsDataProvider.sol:PositionsDataProvider \
+  --chain-id 137 \
+  --etherscan-api-key $POLYGONSCAN_API_KEY \
+  --constructor-args $(cast abi-encode "constructor(address,address)" 0x520986accba2115a9b63231ca062432e7926ec4a 0xb1a80401e961cedb4ff66ce28a6335fae8355521)
 ```
+
+### 6. Verify Deployment (Sanity Checks)
+
+After completing all setup steps, verify the deployment:
+
+```bash
+# Check handlers are registered
+cast call 0x520986accba2115a9b63231ca062432e7926ec4a \
+  "getSupportedHandlers()(address[])" \
+  --rpc-url $POLYGON_MAINNET_RPC_URL
+
+# Check price feed is set for WETH
+cast call 0x81a6169cb92ddcf41a264333b59a777a5351a1d1 \
+  "getPrice(address)(uint256)" \
+  0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL
+
+# Check admin role on entrypoint
+cast call 0x520986accba2115a9b63231ca062432e7926ec4a \
+  "hasRole(bytes32,address)(bool)" \
+  0x0000000000000000000000000000000000000000000000000000000000000000 \
+  0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e \
+  --rpc-url $POLYGON_MAINNET_RPC_URL
+```
+
+---
+
+## Full Deployment Instructions (From Scratch)
+
+If you need to redeploy all contracts from scratch, follow these steps in order. Each step depends on the previous one.
+
+### Prerequisites
+
+1. **Set up environment variables** in `.env`:
+```bash
+POLYGON_MAINNET_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+PRIVATE_KEY=your_deployer_private_key
+POLYGONSCAN_API_KEY=your_polygonscan_api_key
+```
+
+2. **Load environment variables**:
+```bash
+source .env
+```
+
+3. **Ensure deployer has sufficient MATIC** (~25 MATIC recommended for all deployments)
+
+4. **Build contracts**:
+```bash
+forge build
+```
+
+### Step 1: Deploy PriceOracle
+
+The PriceOracle is deployed first as it has no dependencies on other contracts.
+
+```bash
+forge script script/oracle/DeployPriceOracle.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Expected output:** Note the proxy address (e.g., `0x81a6169cb92ddcf41a264333b59a777a5351a1d1`)
+
+**What this deploys:**
+- PriceOracle implementation contract
+- ERC1967Proxy pointing to the implementation
+- Initializes with admin, upgrader, operator, and Pyth oracle address
+
+### Step 2: Deploy PositionsVaultsEntrypoint
+
+The entrypoint is the main contract users interact with.
+
+```bash
+forge script script/vaultsEntrypoint/DeployPositionsVaultsEntrypoint.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Expected output:** Note the proxy address (e.g., `0x520986accba2115a9b63231ca062432e7926ec4a`)
+
+**What this deploys:**
+- PositionsVaultsEntrypoint implementation contract
+- ERC1967Proxy pointing to the implementation
+- Initializes with admin, upgrader, and relayer roles
+
+### Step 3: Deploy PositionsLendingPool
+
+The lending pool requires the oracle address from Step 1.
+
+```bash
+# Replace <ORACLE_PROXY> with the proxy address from Step 1
+forge script script/lendingpool/DeployPositionsLendingPool.s.sol:DeployPositionsLendingPool \
+  --sig "run(address)" \
+  <ORACLE_PROXY> \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Example with actual address:**
+```bash
+forge script script/lendingpool/DeployPositionsLendingPool.s.sol:DeployPositionsLendingPool \
+  --sig "run(address)" \
+  0x81a6169cb92ddcf41a264333b59a777a5351a1d1 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Expected output:** Note the proxy address (e.g., `0xb1a80401e961cedb4ff66ce28a6335fae8355521`)
+
+**What this deploys:**
+- PositionsLendingPool implementation contract
+- ERC1967Proxy pointing to the implementation
+- Initializes with admin, relayer, oracle, and reserve factor
+
+### Step 4: Deploy PositionsLendingPoolHandler
+
+The handler requires both the entrypoint (Step 2) and lending pool (Step 3) addresses.
+
+```bash
+# Replace <ENTRYPOINT_PROXY> and <LENDING_POOL_PROXY> with addresses from Steps 2 and 3
+forge script script/handlers/lendingPool/DeployPositionsLendingPoolHandler.s.sol:DeployPositionsLendingPoolHandler \
+  --sig "run(address,address)" \
+  <ENTRYPOINT_PROXY> \
+  <LENDING_POOL_PROXY> \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Example with actual addresses:**
+```bash
+forge script script/handlers/lendingPool/DeployPositionsLendingPoolHandler.s.sol:DeployPositionsLendingPoolHandler \
+  --sig "run(address,address)" \
+  0x520986accba2115a9b63231ca062432e7926ec4a \
+  0xb1a80401e961cedb4ff66ce28a6335fae8355521 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Expected output:** Note the proxy address (e.g., `0x5558400e4e160b1e34090bd13bcbb9b6ecc530f4`)
+
+**What this deploys:**
+- PositionsLendingPoolHandler implementation contract
+- ERC1967Proxy pointing to the implementation
+- Initializes with entrypoint, lending pool, admin, and upgrader
+
+### Step 5: Deploy PositionsUniV3Handler
+
+The UniV3 handler reads its configuration from the helper config.
+
+```bash
+forge script script/handlers/uniV3/DeployPositionsUniV3Handler.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Expected output:** Note the proxy address (e.g., `0x426e583135d5ce0e4df631674c05f57218885054`)
+
+**What this deploys:**
+- PositionsUniV3Handler implementation contract
+- ERC1967Proxy pointing to the implementation
+- Initializes with relayer, Uniswap V3 NFT manager, admin, and upgrader
+
+### Step 6: Deploy PositionsDataProvider
+
+The data provider requires both the entrypoint (Step 2) and lending pool (Step 3) addresses.
+
+```bash
+# Replace <ENTRYPOINT_PROXY> and <LENDING_POOL_PROXY> with addresses from Steps 2 and 3
+forge script script/utils/DeployPositionsDataProvider.sol:DeployPositionsDataProvider \
+  --sig "run(address,address)" \
+  <ENTRYPOINT_PROXY> \
+  <LENDING_POOL_PROXY> \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Example with actual addresses:**
+```bash
+forge script script/utils/DeployPositionsDataProvider.sol:DeployPositionsDataProvider \
+  --sig "run(address,address)" \
+  0x520986accba2115a9b63231ca062432e7926ec4a \
+  0xb1a80401e961cedb4ff66ce28a6335fae8355521 \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Expected output:** Note the contract address (e.g., `0x2e89f4b127b1db8d5c23328d09f2ac6ff0c5484e`)
+
+**What this deploys:**
+- PositionsDataProvider contract (not upgradeable)
+- Initialized with entrypoint and lending pool addresses
+
+### Deployment Summary
+
+After completing all steps, you should have deployed:
+
+| Order | Contract | Depends On |
+|-------|----------|------------|
+| 1 | PriceOracle | None |
+| 2 | PositionsVaultsEntrypoint | None |
+| 3 | PositionsLendingPool | PriceOracle (Step 1) |
+| 4 | PositionsLendingPoolHandler | Entrypoint (Step 2), LendingPool (Step 3) |
+| 5 | PositionsUniV3Handler | None (reads from config) |
+| 6 | PositionsDataProvider | Entrypoint (Step 2), LendingPool (Step 3) |
+
+### Quick Deploy Script
+
+For convenience, here's a complete script to deploy all contracts in sequence:
+
+```bash
+#!/bin/bash
+set -e
+
+source .env
+
+echo "=== Step 1: Deploying PriceOracle ==="
+forge script script/oracle/DeployPriceOracle.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+echo "Enter the PriceOracle proxy address:"
+read ORACLE_PROXY
+
+echo "=== Step 2: Deploying PositionsVaultsEntrypoint ==="
+forge script script/vaultsEntrypoint/DeployPositionsVaultsEntrypoint.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+echo "Enter the PositionsVaultsEntrypoint proxy address:"
+read ENTRYPOINT_PROXY
+
+echo "=== Step 3: Deploying PositionsLendingPool ==="
+forge script script/lendingpool/DeployPositionsLendingPool.s.sol:DeployPositionsLendingPool \
+  --sig "run(address)" \
+  $ORACLE_PROXY \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+echo "Enter the PositionsLendingPool proxy address:"
+read LENDING_POOL_PROXY
+
+echo "=== Step 4: Deploying PositionsLendingPoolHandler ==="
+forge script script/handlers/lendingPool/DeployPositionsLendingPoolHandler.s.sol:DeployPositionsLendingPoolHandler \
+  --sig "run(address,address)" \
+  $ENTRYPOINT_PROXY \
+  $LENDING_POOL_PROXY \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+echo "=== Step 5: Deploying PositionsUniV3Handler ==="
+forge script script/handlers/uniV3/DeployPositionsUniV3Handler.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+echo "=== Step 6: Deploying PositionsDataProvider ==="
+forge script script/utils/DeployPositionsDataProvider.sol:DeployPositionsDataProvider \
+  --sig "run(address,address)" \
+  $ENTRYPOINT_PROXY \
+  $LENDING_POOL_PROXY \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+echo "=== Deployment Complete ==="
+echo "Oracle Proxy: $ORACLE_PROXY"
+echo "Entrypoint Proxy: $ENTRYPOINT_PROXY"
+echo "LendingPool Proxy: $LENDING_POOL_PROXY"
+```
+
+Save this as `deploy-polygon.sh`, make it executable (`chmod +x deploy-polygon.sh`), and run it.
 
 ---
 
