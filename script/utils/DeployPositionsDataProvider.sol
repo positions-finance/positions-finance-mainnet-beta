@@ -10,14 +10,28 @@ contract DeployPositionsDataProvider is Script {
     PositionsDataProviderHelperConfig public helperConfig;
     PositionsDataProvider public dataProvider;
 
+    /// @notice Deploy with addresses passed as parameters (recommended for mainnet)
+    /// @param entrypoint The PositionsVaultsEntrypoint proxy address
+    /// @param lendingPool The PositionsLendingPool proxy address
+    function run(address entrypoint, address lendingPool) public returns (PositionsDataProvider) {
+        require(entrypoint != address(0), "Entrypoint address cannot be zero");
+        require(lendingPool != address(0), "LendingPool address cannot be zero");
+
+        vm.startBroadcast();
+        dataProvider = new PositionsDataProvider(entrypoint, lendingPool);
+        vm.stopBroadcast();
+
+        return dataProvider;
+    }
+
+    /// @notice Deploy using addresses from config (if pre-configured)
     function run() public returns (PositionsDataProvider) {
         helperConfig = new PositionsDataProviderHelperConfig();
         PositionsDataProviderHelperConfig.NetworkConfig memory config = helperConfig.getActiveNetworkConfig();
 
-        vm.startBroadcast();
-        dataProvider = new PositionsDataProvider(config.entrypoint, config.lendingPool);
-        vm.stopBroadcast();
+        require(config.entrypoint != address(0), "Entrypoint not configured - use run(entrypoint, lendingPool) instead");
+        require(config.lendingPool != address(0), "LendingPool not configured - use run(entrypoint, lendingPool) instead");
 
-        return (dataProvider);
+        return run(config.entrypoint, config.lendingPool);
     }
 }

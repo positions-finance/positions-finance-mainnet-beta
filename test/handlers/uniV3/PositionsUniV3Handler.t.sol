@@ -5,8 +5,6 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {IPositionsPOLHandler} from "@src/interfaces/handlers/pol/IPositionsPOLHandler.sol";
-
 import {MockRelayer} from "@test/mock/MockRelayer.sol";
 import {PositionsUniV3Handler} from "@src/handlers/uniV3/PositionsUniV3Handler.sol";
 import {UniV3HelperConfig} from "@script/handlers/uniV3/UniV3HelperConfig.sol";

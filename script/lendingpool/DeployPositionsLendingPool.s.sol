@@ -13,29 +13,75 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 contract DeployPositionsLendingPool is Script {
     HelperConfigLendingPool helperConfig;
 
-    function run() public returns (HelperConfigLendingPool, PositionsLendingPool) {
+    /// @notice Deploy with oracle address passed as parameter (recommended for mainnet)
+    /// @param oracle The PriceOracle proxy address
+    function run(address oracle) public returns (HelperConfigLendingPool, PositionsLendingPool) {
         helperConfig = new HelperConfigLendingPool();
         NetworkConfig memory config = helperConfig.getActiveNetworkConfig();
+
+        require(oracle != address(0), "Oracle address cannot be zero");
 
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
         vm.startBroadcast();
 
-        // address proxy = Upgrades.deployUUPSProxy(
-        //     "PositionsLendingPool.sol",
-        //     abi.encodeCall(
-        //         PositionsLendingPool.initialize,
-        //         (config.admin, config.positionsRelayer, config.oracle, config.initialReserveFactor)
-        //     ),
-        //     opts
-        // );
-        // PositionsLendingPool(0x501eB689C59c9B577896bcAbcC92bf6926d0B968).utilization(3);
+        address proxy = Upgrades.deployUUPSProxy(
+            "PositionsLendingPool.sol",
+            abi.encodeCall(
+                PositionsLendingPool.initialize,
+                (config.admin, config.positionsRelayer, oracle, config.initialReserveFactor)
+            ),
+            opts
+        );
 
-        // for (uint256 i; i < config.assets.length; ++i) {
-        PositionsLendingPool(0x501eB689C59c9B577896bcAbcC92bf6926d0B968).createLendingPool(
-            0xDeadf18CB9233770FE8874c78D7483b4A126B34a,
-            // placeholder irm
+        vm.stopBroadcast();
+
+        return (helperConfig, PositionsLendingPool(proxy));
+    }
+
+    /// @notice Deploy using oracle address from config (if pre-configured)
+    function run() public returns (HelperConfigLendingPool, PositionsLendingPool) {
+        helperConfig = new HelperConfigLendingPool();
+        NetworkConfig memory config = helperConfig.getActiveNetworkConfig();
+
+        require(config.oracle != address(0), "Oracle not configured - use run(oracle) instead");
+
+        return run(config.oracle);
+    }
+}
+
+contract UpgradePositionsLendingPool is Script {
+    /// @notice Upgrade an existing LendingPool proxy
+    /// @param proxyAddress The existing proxy address to upgrade
+    function run(address proxyAddress) public returns (PositionsLendingPool) {
+        require(proxyAddress != address(0), "Proxy address cannot be zero");
+
+        Options memory opts;
+        opts.unsafeSkipAllChecks = true;
+
+        vm.startBroadcast();
+
+        Upgrades.upgradeProxy(proxyAddress, "PositionsLendingPool.sol", "", opts);
+
+        vm.stopBroadcast();
+
+        return PositionsLendingPool(proxyAddress);
+    }
+}
+
+contract CreateLendingPool is Script {
+    /// @notice Create a new lending pool for an asset
+    /// @param lendingPoolProxy The PositionsLendingPool proxy address
+    /// @param asset The asset address to create a pool for
+    function run(address lendingPoolProxy, address asset) public {
+        require(lendingPoolProxy != address(0), "LendingPool proxy address cannot be zero");
+        require(asset != address(0), "Asset address cannot be zero");
+
+        vm.startBroadcast();
+
+        PositionsLendingPool(lendingPoolProxy).createLendingPool(
+            asset,
             PositionsLendingPool.InterestRateModel({
                 baseRate: 0,
                 slope1: 675000000000000000000000000,
@@ -43,31 +89,7 @@ contract DeployPositionsLendingPool is Script {
                 optimalUtilization: 750000000000000000000000000
             })
         );
-        // }
 
         vm.stopBroadcast();
-
-        // return (helperConfig, PositionsLendingPool(proxy));
-    }
-}
-
-contract UpgradePositionsLendingPool is Script {
-    HelperConfigLendingPool helperConfig;
-
-    function run() public returns (HelperConfigLendingPool, PositionsLendingPool) {
-        helperConfig = new HelperConfigLendingPool();
-
-        Options memory opts;
-        opts.unsafeSkipAllChecks = true;
-
-        address proxy = 0x501eB689C59c9B577896bcAbcC92bf6926d0B968;
-
-        vm.startBroadcast();
-
-        Upgrades.upgradeProxy(proxy, "PositionsLendingPool.sol", "", opts);
-
-        vm.stopBroadcast();
-
-        return (helperConfig, PositionsLendingPool(proxy));
     }
 }

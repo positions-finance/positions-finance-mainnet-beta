@@ -20,6 +20,8 @@ uint64 constant BOBA_SEPOLIA_CHAIN_ID = 28882;
 uint64 constant MANTA_SEPOLIA_CHAIN_ID = 3441006;
 uint64 constant BERACHAIN_MAINNET_CHAIN_ID = 80094;
 uint64 constant ARBITRUM_MAINNET_CHAIN_ID = 42161;
+uint64 constant POLYGON_AMOY_TESTNET_CHAIN_ID = 80002;
+uint64 constant POLYGON_MAINNET_CHAIN_ID = 137;
 
 contract HelperConfig is Script {
     NetworkConfig networkConfig;
@@ -45,6 +47,10 @@ contract HelperConfig is Script {
             networkConfig = getBerachainConfig();
         } else if (block.chainid == ARBITRUM_MAINNET_CHAIN_ID) {
             networkConfig = getArbitrumConfig();
+        } else if (block.chainid == POLYGON_AMOY_TESTNET_CHAIN_ID) {
+            networkConfig = getPolygonAmoyConfig();
+        } else if (block.chainid == POLYGON_MAINNET_CHAIN_ID) {
+            networkConfig = getPolygonMainnetConfig();
         } else {
             revert("Unsupported chain");
         }
@@ -138,6 +144,22 @@ contract HelperConfig is Script {
     function getArbitrumConfig() internal pure returns (NetworkConfig memory) {
         return NetworkConfig({
             // placeholder values, change on each run
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            feeReceipient: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            feePercentage: 100
+        });
+    }
+
+    function getPolygonAmoyConfig() internal pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            feeReceipient: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            feePercentage: 100
+        });
+    }
+
+    function getPolygonMainnetConfig() internal pure returns (NetworkConfig memory) {
+        return NetworkConfig({
             admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             feeReceipient: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             feePercentage: 100

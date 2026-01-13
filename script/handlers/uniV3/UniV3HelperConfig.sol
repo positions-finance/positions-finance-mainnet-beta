@@ -6,6 +6,7 @@ import {Script} from "forge-std-1.9.7/src/Script.sol";
 import {ChainIds} from "../../utils/ChainIds.sol";
 
 contract UniV3HelperConfig is Script, ChainIds {
+    address constant POLYGON_MAINNET_UNIV3_NFT_POSITION_MANAGER = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
     struct NetworkConfig {
         address relayer;
         address nonFungiblePositionManager;
@@ -24,6 +25,8 @@ contract UniV3HelperConfig is Script, ChainIds {
             activeNetworkConfig = _getBepoliaConfig();
         } else if (block.chainid == ARBITRUM_MAINNET_CHAIN_ID) {
             activeNetworkConfig = _getArbitrumConfig();
+        } else if (block.chainid == POLYGON_MAINNET_CHAIN_ID) {
+            activeNetworkConfig = _getPolygonMainnetConfig();
         } else {
             revert HelperConfig__UnsupportedChain(block.chainid);
         }
@@ -53,6 +56,15 @@ contract UniV3HelperConfig is Script, ChainIds {
             nonFungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
             upgrader: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF
+        });
+    }
+
+    function _getPolygonMainnetConfig() private pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            relayer: 0x98Fd8A40528FC3BD92c6F231bEe0551295FeCeE4,
+            nonFungiblePositionManager: POLYGON_MAINNET_UNIV3_NFT_POSITION_MANAGER,
+            admin: 0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e,
+            upgrader: 0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e
         });
     }
 

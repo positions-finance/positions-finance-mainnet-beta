@@ -30,6 +30,8 @@ contract PositionsDataProviderHelperConfig is Script, ChainIds {
             activeNetworkConfig = _getUnichainSepoliaConfig();
         } else if (block.chainid == MONAD_CHAIN_ID) {
             activeNetworkConfig = _getMonadConfig();
+        } else if (block.chainid == POLYGON_MAINNET_CHAIN_ID) {
+            activeNetworkConfig = _getPolygonMainnetConfig();
         } else {
             revert HelperConfig__UnsupportedChain(block.chainid);
         }
@@ -74,6 +76,10 @@ contract PositionsDataProviderHelperConfig is Script, ChainIds {
 
     function _getMonadConfig() private pure returns (NetworkConfig memory) {
         return NetworkConfig({entrypoint: address(0), lendingPool: 0xA8d72E481724B91122E98D2a924E7544CE703C84});
+    }
+
+    function _getPolygonMainnetConfig() private pure returns (NetworkConfig memory) {
+        return NetworkConfig({entrypoint: address(0), lendingPool: address(0)});
     }
 
     function getActiveNetworkConfig() external view returns (NetworkConfig memory) {

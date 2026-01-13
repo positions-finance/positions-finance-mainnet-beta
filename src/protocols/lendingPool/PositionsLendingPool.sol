@@ -105,8 +105,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// the requestId is removed.
     mapping(uint256 tokenId => mapping(address asset => EnumerableSet.Bytes32Set requestIds)) private
         userToAssetToRequestIds;
-    /// @notice The loops contract addresses.
-    EnumerableSet.AddressSet internal loops;
 
     //////////////
     /// Events ///
@@ -123,8 +121,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     event BorrowRequestFulfilled(uint256 indexed tokenId, address indexed asset, uint256 indexed amount);
     event Repay(address by, uint256 indexed amount, uint256 indexed tokenId);
     event BorrowRequest(bytes32 indexed requestId);
-    event LoopsSet(address indexed loops);
-    event BorrowedForLoops(uint256 loops, address indexed token, uint256 indexed amount);
 
     //////////////
     /// Errors ///
@@ -142,7 +138,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     error LendingPoolDoesNotExist(PoolData lendingPoolData);
     error InsufficientBalance();
     error NotRelayer();
-    error NotLoops(address caller);
 
     /////////////////
     /// Modifiers ///
@@ -155,12 +150,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         _;
     }
 
-    modifier onlyLoops() {
-        if (!loops.contains(msg.sender)) {
-            revert NotLoops(msg.sender);
-        }
-        _;
-    }
 
     ///////////////////
     /// Constructor ///
@@ -226,15 +215,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         emit TreasurySet(_newTreasury);
     }
 
-    /// @notice Allows the owner to set the loops contract address.
-    /// @param _loops The loops contract address..
-    function setLoops(address _loops) external onlyOwner {
-        if (_loops == address(0)) revert AddressZero();
-
-        loops.add(_loops);
-
-        emit LoopsSet(_loops);
-    }
 
     /// @notice Allows the protocol admin to create lending pools with custom interest rate models for different
     /// assets.
@@ -387,25 +367,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         emit BorrowRequestFulfilled(collateralRequest.tokenId, collateralRequest.token, collateralRequest.tokenAmount);
     }
 
-    /// @notice Borrows amount for loops.
-    function borrowForLoops(address _token, uint256 _amount) external onlyLoops {
-        PoolData storage lendingPoolData = poolData[_token];
-        BorrowerInfo storage borrowerInfo = tokenIdToAssetToBorrowInfo[uint256(uint160(msg.sender))][_token];
 
-        if (_amount == 0) revert AmountZero();
-        _revertIfLendingPoolDoesNotExist(lendingPoolData);
-        _accrueInterest(_token, lendingPoolData);
-        if (lendingPoolData.totalLent <= lendingPoolData.totalBorrowed) revert InsufficientLiquidityInLendingPool();
-
-        borrowerInfo.borrowedAmount += _amount;
-        borrowerInfo.borrowIndexSnapshot = lendingPoolData.borrowIndex;
-
-        lendingPoolData.totalBorrowed += _amount;
-
-        IERC20(_token).safeTransfer(msg.sender, _amount);
-
-        emit BorrowedForLoops(uint256(uint160(msg.sender)), _token, _amount);
-    }
 
     /// @notice Allows anyone to repay debt amount for any valid borrow position.
     /// @param _asset The asset address.

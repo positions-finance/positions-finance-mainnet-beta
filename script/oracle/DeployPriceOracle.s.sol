@@ -10,6 +10,8 @@ import {PriceOracle} from "@src/oracle/PriceOracle.sol";
 contract DeployPositionsVaultsEntrypoint is Script {
     PriceOracle public oracle;
 
+
+    // polygon mainnet deployment
     function run() public returns (PriceOracle) {
         vm.startBroadcast();
         oracle = new PriceOracle();
@@ -18,10 +20,10 @@ contract DeployPositionsVaultsEntrypoint is Script {
             abi.encodeCall(
                 PriceOracle.initialize,
                 (
-                    0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
-                    0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
-                    0x7477a2fb34180486D36B5aBDfa59136bCA061C17,
-                    0x2880aB155794e7179c9eE2e38200202908C17B43
+                    0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e,  // admin
+                    0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e,  // upgrader
+                    0x98Fd8A40528FC3BD92c6F231bEe0551295FeCeE4,  // operator
+                    0xff1a0f4744e8582DF1aE09D5611b887B6a12925C   // Pyth on Polygon Mainnet
                 )
             )
         );

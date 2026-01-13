@@ -7,7 +7,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Test, console} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-import {IPositionsPOLHandler} from "@src/interfaces/handlers/pol/IPositionsPOLHandler.sol";
 import {IPositionsVaultsEntrypoint} from "@src/interfaces/entryPoint/IPositionsVaultsEntrypoint.sol";
 import {IPositionsLendingPool} from "@src/interfaces/protocols/lendingPool/IPositionsLendingPool.sol";
 
@@ -140,7 +139,7 @@ contract PositionsLendingPoolHandlerTest is Test {
 
         vm.startPrank(user);
         IERC20(HONEY).approve(address(entrypoint), _amount);
-        entrypoint.deposit(address(lendingPoolHandler), HONEY, _amount, tokenId, proof, "");
+        entrypoint.deposit(address(lendingPoolHandler), HONEY, _amount, tokenId, "");
         vm.stopPrank();
     }
 
