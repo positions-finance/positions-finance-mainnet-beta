@@ -1,4 +1,6 @@
 out
 cache
-dependencies
 .env
+node_modules
+.idea
+dependencies
