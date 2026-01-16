@@ -160,8 +160,8 @@ contract HelperConfig is Script {
 
     function getPolygonMainnetConfig() internal pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            admin: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
-            feeReceipient: 0x3AC44cA8b613A139E7cCc0Be3e5F9955867bfFDF,
+            admin: 0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e,
+            feeReceipient: 0x35f6e214676208fd20dCD93d19f10e909FF2Bb8e,
             feePercentage: 100
         });
     }

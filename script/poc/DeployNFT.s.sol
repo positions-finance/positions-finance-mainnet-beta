@@ -4,9 +4,9 @@ pragma solidity ^0.8.19;
 
 import {Script} from "forge-std-1.9.7/src/Script.sol";
 import {HelperConfig, NetworkConfig} from "./HelperConfig.s.sol";
-import {Upgrades} from "openzeppelin-foundry-upgrades-0.4.0/src/Upgrades.sol";
+import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {PositionsNFT} from "@src/poc/PositionsNFT.sol";
-import {Options} from "openzeppelin-foundry-upgrades-0.4.0/src/Options.sol";
 
 contract DeployNFT is Script {
     HelperConfig helperConfig;
@@ -22,7 +22,8 @@ contract DeployNFT is Script {
 
         address proxy =
             Upgrades.deployUUPSProxy("PositionsNFT.sol", abi.encodeCall(PositionsNFT.initialize, (config.admin)), opts);
-        PositionsNFT(proxy).pauseTransfers();
+        // Note: pauseTransfers() must be called by the admin after deployment
+        // cast send <NFT_PROXY> "pauseTransfers()" --rpc-url $POLYGON_MAINNET_RPC_URL --private-key <ADMIN_PRIVATE_KEY>
 
         vm.stopBroadcast();
 
