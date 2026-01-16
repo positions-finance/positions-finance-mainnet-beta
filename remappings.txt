@@ -7,3 +7,4 @@
 @test/=test/
 forge-std-1.9.7/=dependencies/forge-std-1.9.7/
 openzeppelin-foundry-upgrades-0.4.0/=dependencies/openzeppelin-foundry-upgrades-0.4.0/
+openzeppelin-foundry-upgrades/=dependencies/openzeppelin-foundry-upgrades-0.4.0/src/

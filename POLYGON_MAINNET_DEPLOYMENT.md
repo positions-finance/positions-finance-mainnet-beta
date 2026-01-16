@@ -41,6 +41,7 @@ The core protocol functionality is fully operational on Polygon: the **Positions
 | **PositionsUniV3Handler** | `0x426e583135d5ce0e4df631674c05f57218885054` | `0x5bb0844984a92761b67c6b5b6efecc6e6ee4c5b5` |
 | **PositionsDataProvider** | `0x2e89f4b127b1db8d5c23328d09f2ac6ff0c5484e` | N/A (not upgradeable) |
 | **PositionsRelayer** | `0x75006782db64a40dc08fb3e4e66d9da62026a549` | `0x84c2e344a651b07ba12c7749c89044319c3c884f` |
+| **PositionsNFT** | `0xa46ffd9e5afb3f7df666e26a5741399298c2b5d8` | See broadcast logs |
 
 ### Supporting Contracts
 
@@ -499,6 +500,34 @@ forge script script/poc/DeployRelayer.s.sol:DeployRelayer \
 - ERC1967Proxy pointing to the implementation
 - Initializes with admin, fee recipient, and fee percentage
 
+### Step 8: Deploy PositionsNFT (Optional)
+
+The NFT contract allows minting membership NFTs for the protocol.
+
+```bash
+forge script script/poc/DeployNFT.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+**Expected output:** Note the proxy address (e.g., `0xa46ffd9e5afb3f7df666e26a5741399298c2b5d8`)
+
+**What this deploys:**
+- PositionsNFT implementation contract
+- ERC1967Proxy pointing to the implementation
+- Initializes with admin address from HelperConfig
+
+**Post-deployment action required:**
+The admin must call `pauseTransfers()` to restrict NFT transfers if desired:
+
+```bash
+cast send <NFT_PROXY> \
+  "pauseTransfers()" \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --private-key <ADMIN_PRIVATE_KEY>
+```
+
 ### Deployment Summary
 
 After completing all steps, you should have deployed:
@@ -512,6 +541,7 @@ After completing all steps, you should have deployed:
 | 5 | PositionsUniV3Handler | None (reads from config) |
 | 6 | PositionsDataProvider | Entrypoint (Step 2), LendingPool (Step 3) |
 | 7 | PositionsRelayer | None (reads from config) |
+| 8 | PositionsNFT (Optional) | None (reads from config) |
 
 ### Quick Deploy Script
 
@@ -585,11 +615,21 @@ forge script script/poc/DeployRelayer.s.sol:DeployRelayer \
 echo "Enter the PositionsRelayer proxy address:"
 read RELAYER_PROXY
 
+echo "=== Step 8: Deploying PositionsNFT (Optional) ==="
+forge script script/poc/DeployNFT.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+echo "Enter the PositionsNFT proxy address:"
+read NFT_PROXY
+
 echo "=== Deployment Complete ==="
 echo "Oracle Proxy: $ORACLE_PROXY"
 echo "Entrypoint Proxy: $ENTRYPOINT_PROXY"
 echo "LendingPool Proxy: $LENDING_POOL_PROXY"
 echo "Relayer Proxy: $RELAYER_PROXY"
+echo "NFT Proxy: $NFT_PROXY"
 ```
 
 Save this as `deploy-polygon.sh`, make it executable (`chmod +x deploy-polygon.sh`), and run it.
@@ -744,6 +784,18 @@ forge script script/utils/DeployPositionsDataProvider.sol:DeployPositionsDataPro
   --rpc-url $POLYGON_MAINNET_RPC_URL \
   --broadcast \
   --private-key $PRIVATE_KEY
+
+# 7. Deploy PositionsRelayer
+forge script script/poc/DeployRelayer.s.sol:DeployRelayer \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+
+# 8. Deploy PositionsNFT (Optional)
+forge script script/poc/DeployNFT.s.sol \
+  --rpc-url $POLYGON_MAINNET_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
 ```
 
 ---
@@ -759,7 +811,8 @@ forge script script/utils/DeployPositionsDataProvider.sol:DeployPositionsDataPro
 | UniV3Handler | ~3.3M | ~3.97 |
 | DataProvider | ~0.55M | ~0.67 |
 | PositionsRelayer | ~2.7M | ~8.66 |
-| **Total** | ~20.05M | ~28.41 |
+| PositionsNFT | ~2.7M | ~2.11 |
+| **Total** | ~22.75M | ~30.52 |
 
 ---
 
