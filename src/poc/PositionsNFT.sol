@@ -62,7 +62,8 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
     }
 
     /// @notice Allows a relayer to mint a positions Nft to a user address.
-    function mint(address _to) external onlyRole(RELAYER_ROLE) {
+    // removed onlyRole(RELAYER_ROLE)
+    function mint(address _to) external {
         if (balanceOf(_to) > 0) revert PositionsNftAlreadyMinted();
 
         uint256 tokenId = ++totalSupply;
@@ -75,9 +76,9 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
     /// @param _to The address to transfer the Nft to.
     /// @param _tokenId The Nft tokenId.
     function transferFrom(address _from, address _to, uint256 _tokenId)
-        public
-        override
-        shouldHavePassedCoolDown(_tokenId)
+    public
+    override
+    shouldHavePassedCoolDown(_tokenId)
     {
         if (isTransferPaused) revert TransferPaused();
 
@@ -91,9 +92,9 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
     /// @param _to The address to transfer the Nft to.
     /// @param _tokenId The Nft tokenId.
     function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes memory _data)
-        public
-        override
-        shouldHavePassedCoolDown(_tokenId)
+    public
+    override
+    shouldHavePassedCoolDown(_tokenId)
     {
         if (isTransferPaused) revert TransferPaused();
 
@@ -111,10 +112,10 @@ contract PositionsNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Acce
 
     /// @notice Override required by solidity.
     function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721Upgradeable, AccessControlUpgradeable)
-        returns (bool)
+    public
+    view
+    override(ERC721Upgradeable, AccessControlUpgradeable)
+    returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }

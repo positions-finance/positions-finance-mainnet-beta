@@ -47,8 +47,8 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
     /// @param _admin The admin address.
     /// @param _upgrader The upgrader address which receives the upgrader role.
     function initialize(address _entryPoint, address _lendingPool, address _admin, address _upgrader)
-        public
-        initializer
+    public
+    initializer
     {
         __UUPSUpgradeable_init();
         __AccessControl_init();
@@ -96,9 +96,9 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
     /// @param _tokenId The user's Nft token Id.
     /// @param _additionalData The abi encoded token address.
     function queueWithdraw(address _token, uint256 _amount, uint256 _tokenId, bytes calldata _additionalData)
-        external
-        view
-        onlyEntryPoint
+    external
+    view
+    onlyEntryPoint
     {
         address token = abi.decode(_additionalData, (address));
         if (_token != token) revert PositionsLendingPoolHandler__TokenAddressMismatch();
@@ -118,9 +118,9 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
     /// @return The token address.
     /// @return The amount of tokens withdrawn.
     function completeWithdraw(IPositionsVaultsEntrypoint.WithdrawData memory _withdrawData, address _to, bytes calldata)
-        external
-        onlyEntryPoint
-        returns (address, uint256)
+    external
+    onlyEntryPoint
+    returns (address, uint256)
     {
         address token = address(uint160(_withdrawData.poolOrVault));
         IPositionsLendingPool(lendingPool).withdraw(token, _withdrawData.amount, _to);
@@ -137,8 +137,8 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
     /// @param _tokenId The Nft tokenId.
     /// @param _additionalData The additional bytes data to be decoded into the token address.
     function liquidate(address _token, uint256 _amount, uint256 _tokenId, address, bytes calldata _additionalData)
-        external
-        onlyEntryPoint
+    external
+    onlyEntryPoint
     {
         address token = abi.decode(_additionalData, (address));
         if (_token != token) revert PositionsLendingPoolHandler__TokenAddressMismatch();
@@ -157,9 +157,9 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
     /// @notice Complete a liquidation and withdraw funds.
     /// @param _withdrawData The withdrawal data passed by the entrypoint contract.
     function completeLiquidation(IPositionsVaultsEntrypoint.WithdrawData memory _withdrawData, bytes calldata)
-        external
-        onlyEntryPoint
-        returns (address, uint256)
+    external
+    onlyEntryPoint
+    returns (address, uint256)
     {
         address token = address(uint160(_withdrawData.poolOrVault));
         IPositionsLendingPool(lendingPool).withdraw(token, _withdrawData.amount, _withdrawData.to);
@@ -173,11 +173,11 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
     /// @notice Callback into the handler once a withdrawal request is accepted.
     /// @param _withdrawalData The withdrawal data.
     function withdrawalRequestAccepted(IPositionsVaultsEntrypoint.WithdrawData memory _withdrawalData)
-        external
-        onlyEntryPoint
+    external
+    onlyEntryPoint
     {
         positions[_withdrawalData.tokenId][address(uint160(_withdrawalData.poolOrVault))].depositAmount -=
-            _withdrawalData.amount;
+                        _withdrawalData.amount;
     }
 
     function _authorizeUpgrade(address newImplementation) internal virtual override onlyRole(UPGRADER_ROLE) {}
@@ -216,7 +216,7 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
 
     function getTvl(address _asset) external view returns (uint256) {
         (uint256 depositAmount, uint256 supplyIndex) =
-            IPositionsLendingPool(lendingPool).userToAssetToLendingInfo(address(this), _asset);
+                                IPositionsLendingPool(lendingPool).userToAssetToLendingInfo(address(this), _asset);
         (,, uint256 currentSupplyIndex,,,) = IPositionsLendingPool(lendingPool).poolData(_asset);
 
         return ((currentSupplyIndex * depositAmount) / supplyIndex);

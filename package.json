@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/positions-finance/positions-finance-mainnet-beta#readme",
   "dependencies": {
+    "@chainlink/contracts": "^1.5.0",
     "@openzeppelin/contracts": "^5.4.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@openzeppelin/foundry-upgrades": "^0.4.0",
