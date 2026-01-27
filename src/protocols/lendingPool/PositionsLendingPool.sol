@@ -104,7 +104,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// @dev Tracks the borrow request Ids per user's Nft per asset. If a borrow position is liquidated or repaid,
     /// the requestId is removed.
     mapping(uint256 tokenId => mapping(address asset => EnumerableSet.Bytes32Set requestIds)) private
-        userToAssetToRequestIds;
+    userToAssetToRequestIds;
 
     //////////////
     /// Events ///
@@ -119,7 +119,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     event Supply(address user, address indexed asset, uint256 indexed amount, address indexed onBehalfOf);
     event Withdraw(address indexed by, uint256 indexed amount, uint256 indexed interest, address to);
     event BorrowRequestFulfilled(uint256 indexed tokenId, address indexed asset, uint256 indexed amount);
-    event Repay(address by, uint256 indexed amount, uint256 indexed tokenId);
+    event Repay(address by, address indexed asset, uint256 indexed amount, uint256 indexed tokenId);
     event BorrowRequest(bytes32 indexed requestId);
 
     //////////////
@@ -150,7 +150,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         _;
     }
 
-
     ///////////////////
     /// Constructor ///
     ///////////////////
@@ -161,8 +160,8 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// @param _priceOracle The price oracle contract address.
     /// @param _initialReserveFactor The initial reserve factor (in bps).
     function initialize(address _admin, address _positionsRelayer, address _priceOracle, uint256 _initialReserveFactor)
-        public
-        initializer
+    public
+    initializer
     {
         __Ownable_init(_admin);
 
@@ -215,7 +214,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         emit TreasurySet(_newTreasury);
     }
 
-
     /// @notice Allows the protocol admin to create lending pools with custom interest rate models for different
     /// assets.
     /// @param _asset The asset to create a lending pool for.
@@ -224,9 +222,9 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     function createLendingPool(address _asset, InterestRateModel calldata _interestRateModel) external onlyOwner {
         if (
             _asset == address(0) || _interestRateModel.slope1 == 0 || _interestRateModel.slope2 == 0
-                || _interestRateModel.optimalUtilization == 0 || _interestRateModel.baseRate > E27
-                || _interestRateModel.slope1 > E27 || _interestRateModel.slope2 > E27
-                || _interestRateModel.optimalUtilization > E27
+            || _interestRateModel.optimalUtilization == 0 || _interestRateModel.baseRate > E27
+            || _interestRateModel.slope1 > E27 || _interestRateModel.slope2 > E27
+            || _interestRateModel.optimalUtilization > E27
         ) revert InvalidLendingPoolConfig();
 
         PoolData memory lendingPoolData = PoolData({
@@ -247,14 +245,14 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// @param _asset The asset address.
     /// @param _interestRateModel The new interest rate model.
     function updateLendingPoolInterestRateModel(address _asset, InterestRateModel calldata _interestRateModel)
-        external
-        onlyOwner
+    external
+    onlyOwner
     {
         if (
             _asset == address(0) || _interestRateModel.slope1 == 0 || _interestRateModel.slope2 == 0
-                || _interestRateModel.optimalUtilization == 0 || _interestRateModel.baseRate > E27
-                || _interestRateModel.slope1 > E27 || _interestRateModel.slope2 > E27
-                || _interestRateModel.optimalUtilization > E27
+            || _interestRateModel.optimalUtilization == 0 || _interestRateModel.baseRate > E27
+            || _interestRateModel.slope1 > E27 || _interestRateModel.slope2 > E27
+            || _interestRateModel.optimalUtilization > E27
         ) revert InvalidLendingPoolConfig();
 
         poolData[_asset].interestRateModel = _interestRateModel;
@@ -327,7 +325,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     ) external returns (bytes32) {
         if (
             _collateralRequest.protocol != address(this) || !supportedAssets.contains(_collateralRequest.token)
-                || _collateralRequest.owner != msg.sender || _collateralRequest.tokenAmount == 0
+        || _collateralRequest.owner != msg.sender || _collateralRequest.tokenAmount == 0
         ) revert InvalidRequest(_collateralRequest);
 
         bytes32 requestId = IPositionsRelayer(positionsRelayer).requestCollateral(_collateralRequest, _signature);
@@ -342,11 +340,11 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// @param _requestId The borrow requestId.
     function fullfillCollateralRequest(bytes32 _requestId) external onlyRelayer {
         IPositionsRelayer.PositionsCollateralRequest memory collateralRequest =
-            IPositionsRelayer(positionsRelayer).collateralRequests(_requestId);
+                                IPositionsRelayer(positionsRelayer).collateralRequests(_requestId);
 
         PoolData storage lendingPoolData = poolData[collateralRequest.token];
         BorrowerInfo storage borrowerInfo =
-            tokenIdToAssetToBorrowInfo[collateralRequest.tokenId][collateralRequest.token];
+                            tokenIdToAssetToBorrowInfo[collateralRequest.tokenId][collateralRequest.token];
 
         if (collateralRequest.tokenAmount == 0) revert AmountZero();
         _revertIfLendingPoolDoesNotExist(lendingPoolData);
@@ -366,8 +364,6 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
 
         emit BorrowRequestFulfilled(collateralRequest.tokenId, collateralRequest.token, collateralRequest.tokenAmount);
     }
-
-
 
     /// @notice Allows anyone to repay debt amount for any valid borrow position.
     /// @param _asset The asset address.
@@ -391,7 +387,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
 
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
 
-        emit Repay(msg.sender, _amount, _tokenId);
+        emit Repay(msg.sender, _asset, _amount, _tokenId);
     }
 
     /// @notice Utility function to accrue interest and update the supply and borrow indices.
@@ -417,16 +413,16 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         }
 
         (uint256 updatedSupplyIndex, uint256 updatedBorrowIndex, uint256 updatedSupplyIndexWithReserveFactor) =
-            _currentSupplyAndBorrowIndex(_lendingPoolData);
+                        _currentSupplyAndBorrowIndex(_lendingPoolData);
 
         uint256 interestCutForTreasury = (
             (
                 ((updatedSupplyIndexWithReserveFactor * _lendingPoolData.totalLent) / _lendingPoolData.supplyIndex)
-                    - _lendingPoolData.totalLent
+                - _lendingPoolData.totalLent
             ) * reserveFactor
         ) / BPS;
         uint256 treasurySupplyInterest =
-            _calculateAccruedLenderInterest(_lendingPoolData, userToAssetToLendingInfo[treasury][_asset]);
+                        _calculateAccruedLenderInterest(_lendingPoolData, userToAssetToLendingInfo[treasury][_asset]);
 
         userToAssetToLendingInfo[treasury][_asset].depositAmount += interestCutForTreasury + treasurySupplyInterest;
         userToAssetToLendingInfo[treasury][_asset].supplyIndexSnapshot = updatedSupplyIndex;
@@ -439,9 +435,9 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     }
 
     function _currentSupplyAndBorrowIndex(PoolData memory _lendingPoolData)
-        internal
-        view
-        returns (uint256, uint256, uint256)
+    internal
+    view
+    returns (uint256, uint256, uint256)
     {
         uint256 timeElapsed = block.timestamp - _lendingPoolData.lastAccrualTimestamp;
 
@@ -470,9 +466,9 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     }
 
     function _getInterestRates(PoolData memory _lendingPoolData, uint256 _utilization)
-        internal
-        view
-        returns (uint256 supplyRate, uint256 borrowRate)
+    internal
+    view
+    returns (uint256 supplyRate, uint256 borrowRate)
     {
         InterestRateModel memory interestRateModel = _lendingPoolData.interestRateModel;
 
@@ -489,9 +485,9 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     }
 
     function _calculateAccruedLenderInterest(PoolData memory _lendingPoolData, LenderInfo memory _lenderInfo)
-        internal
-        view
-        returns (uint256)
+    internal
+    view
+    returns (uint256)
     {
         if (_lenderInfo.supplyIndexSnapshot == 0) {
             return 0;
@@ -504,9 +500,9 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     }
 
     function _calculateBorrowerDebt(PoolData memory _lendingPoolData, BorrowerInfo memory _borrowerInfo)
-        internal
-        view
-        returns (uint256)
+    internal
+    view
+    returns (uint256)
     {
         if (_borrowerInfo.borrowIndexSnapshot == 0) {
             return 0;
@@ -626,7 +622,7 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
             supplierData[i] = SupplierData({
                 asset: assets[i],
                 balanceWithInterest: (poolData[assets[i]].supplyIndex * supplierInfo.depositAmount)
-                    / supplierInfo.supplyIndexSnapshot
+            / supplierInfo.supplyIndexSnapshot
             });
         }
 
