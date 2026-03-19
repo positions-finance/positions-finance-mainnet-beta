@@ -104,8 +104,8 @@ contract PolymarketVault is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    modifier onlyOwnerOrOperator() {
-        require(msg.sender == owner() || msg.sender == operator, "Not owner or operator");
+    modifier onlyOperator() {
+        require(msg.sender == operator, "Not operator");
         _;
     }
 
@@ -116,7 +116,7 @@ contract PolymarketVault is
         emit OperatorUpdated(_operator);
     }
 
-    function setWhitelistedConditionId(bytes32 _conditionId, bool _status) external onlyOwner {
+    function setWhitelistedConditionId(bytes32 _conditionId, bool _status) external onlyOperator {
         whitelistedConditions[_conditionId] = _status;
         emit ConditionWhitelistUpdated(_conditionId, _status);
     }
@@ -124,7 +124,7 @@ contract PolymarketVault is
     /**
      * @notice Admin or Operator approves a withdrawal request.
      */
-    function approveWithdrawal(uint256 _requestId) external onlyOwnerOrOperator {
+    function approveWithdrawal(uint256 _requestId) external onlyOperator {
         WithdrawalRequest storage request = withdrawalRequests[_requestId];
         require(request.user != address(0), "Request does not exist");
         require(request.status == WithdrawalStatus.Pending, "Not pending");
@@ -136,7 +136,7 @@ contract PolymarketVault is
     /**
      * @notice Admin or Operator rejects a withdrawal request, returning funds to the user.
      */
-    function rejectWithdrawal(uint256 _requestId) external onlyOwnerOrOperator {
+    function rejectWithdrawal(uint256 _requestId) external onlyOperator {
         WithdrawalRequest storage request = withdrawalRequests[_requestId];
         require(request.user != address(0), "Request does not exist");
         require(request.status == WithdrawalStatus.Pending, "Not pending");
@@ -159,7 +159,7 @@ contract PolymarketVault is
         address _liquidatorRecipient,
         uint256 _tokenId,
         uint256 _amount
-    ) external onlyOwner nonReentrant {
+    ) external onlyOperator nonReentrant {
         require(_liquidatorRecipient != address(0), "Invalid recipient");
         require(userBalances[_borrower][_tokenId] >= _amount, "Insufficient free collateral");
 
