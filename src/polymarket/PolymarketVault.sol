@@ -121,6 +121,13 @@ contract PolymarketVault is
         emit ConditionWhitelistUpdated(_conditionId, _status);
     }
 
+    function setWhitelistedConditionIds(bytes32[] calldata _conditionIds, bool _status) external onlyOperator {
+        for (uint256 i = 0; i < _conditionIds.length; i++) {
+            whitelistedConditions[_conditionIds[i]] = _status;
+            emit ConditionWhitelistUpdated(_conditionIds[i], _status);
+        }
+    }
+
     /**
      * @notice Admin or Operator approves a withdrawal request.
      */

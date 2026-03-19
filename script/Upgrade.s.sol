@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/src/Script.sol";
-import "forge-std/src/console.sol";
+import "forge-std/Script.sol";
+import "forge-std/console.sol";
 import "../src/polymarket/PolymarketVault.sol";
 
 contract UpgradePolymarketVault is Script {
@@ -15,7 +15,7 @@ contract UpgradePolymarketVault is Script {
         address proxyAddress = 0x0Ea8C132F7D30E01E1F99988cEE8E195A89D29F7;
 
         // Replace with the address of the implementation contract you already deployed
-        address existingImplementation = 0xdE1C98A9ca01C080a8BF0d4e2Ce3c8fDA38b7593;
+        address existingImplementation = 0xf767F93dd72e909b17aeD00b19dA76a8E9764964;
 
         vm.startBroadcast(deployerPrivateKey);
 

@@ -7,7 +7,7 @@
 @src/=src/
 @test/=test/
 forge-std-1.9.7/=dependencies/forge-std/
-forge-std/=dependencies/forge-std/
+forge-std/=dependencies/forge-std/src/
 openzeppelin-foundry-upgrades-0.4.0/=node_modules/@openzeppelin/foundry-upgrades/
 openzeppelin-foundry-upgrades/=node_modules/@openzeppelin/foundry-upgrades/src/
 @chainlink/contracts/=node_modules/@chainlink/contracts/
