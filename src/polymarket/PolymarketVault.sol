@@ -39,7 +39,7 @@ contract PolymarketVault is
     // --- Constants ---
 
     address public constant CTF_ADDRESS = 0x4D97DCd97eC945f40cF65F87097ACe5EA0476045;
-    address public constant USDC_E = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
+    address public constant P_USD = 0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB;
     address public constant WRAPPED_COLLATERAL = 0x3A3BD7bb9528E159577F7C2e685CC81A765002E2;
 
     // --- State Variables ---
@@ -199,7 +199,7 @@ contract PolymarketVault is
         require(whitelistedConditions[_conditionId], "Condition not whitelisted");
         require(_amount > 0, "Amount must be > 0");
 
-        address collateralToken = _isNegRisk ? WRAPPED_COLLATERAL : USDC_E;
+        address collateralToken = _isNegRisk ? WRAPPED_COLLATERAL : P_USD;
         bytes32 parentCollectionId = bytes32(0);
 
         bytes32 collectionIdIndex1 = IConditionalTokens(CTF_ADDRESS).getCollectionId(parentCollectionId, _conditionId, 1);
