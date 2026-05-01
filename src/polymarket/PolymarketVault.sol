@@ -41,6 +41,7 @@ contract PolymarketVault is
     address public constant CTF_ADDRESS = 0x4D97DCd97eC945f40cF65F87097ACe5EA0476045;
     address public constant P_USD = 0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB;
     address public constant WRAPPED_COLLATERAL = 0x3A3BD7bb9528E159577F7C2e685CC81A765002E2;
+    address public constant USDC_E = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
 
     // --- State Variables ---
 
@@ -199,25 +200,40 @@ contract PolymarketVault is
         require(whitelistedConditions[_conditionId], "Condition not whitelisted");
         require(_amount > 0, "Amount must be > 0");
 
+        // Default to V2 Collateral
         address collateralToken = _isNegRisk ? WRAPPED_COLLATERAL : P_USD;
         bytes32 parentCollectionId = bytes32(0);
 
         bytes32 collectionIdIndex1 = IConditionalTokens(CTF_ADDRESS).getCollectionId(parentCollectionId, _conditionId, 1);
         bytes32 collectionIdIndex2 = IConditionalTokens(CTF_ADDRESS).getCollectionId(parentCollectionId, _conditionId, 2);
 
+        // Calculate expected V2 Token IDs
         uint256 positionIdIndex1 = IConditionalTokens(CTF_ADDRESS).getPositionId(collateralToken, collectionIdIndex1);
         uint256 positionIdIndex2 = IConditionalTokens(CTF_ADDRESS).getPositionId(collateralToken, collectionIdIndex2);
 
-        OutcomeType outcomeType;
+        OutcomeType outcomeType = OutcomeType.NONE;
+
+        // 1. Check if it matches V2
         if (_tokenId == positionIdIndex1) {
             outcomeType = OutcomeType.OUTCOME_1;
         } else if (_tokenId == positionIdIndex2) {
             outcomeType = OutcomeType.OUTCOME_2;
-        } else {
-            revert("Invalid Token ID: Does not match CTF");
+        }
+            // 2. FALLBACK: Check if it matches Legacy V1 (USDC.e)
+        else if (!_isNegRisk) {
+            uint256 v1PositionIdIndex1 = IConditionalTokens(CTF_ADDRESS).getPositionId(USDC_E, collectionIdIndex1);
+            uint256 v1PositionIdIndex2 = IConditionalTokens(CTF_ADDRESS).getPositionId(USDC_E, collectionIdIndex2);
+
+            if (_tokenId == v1PositionIdIndex1) {
+                outcomeType = OutcomeType.OUTCOME_1;
+            } else if (_tokenId == v1PositionIdIndex2) {
+                outcomeType = OutcomeType.OUTCOME_2;
+            }
         }
 
-        // FIXED: Checks-Effects-Interactions (CEI) Pattern. Update state BEFORE external transfer.
+        require(outcomeType != OutcomeType.NONE, "Invalid Token ID: Does not match CTF");
+
+        // Update state
         userBalances[msg.sender][_tokenId] += _amount;
 
         IConditionalTokens(CTF_ADDRESS).safeTransferFrom(
