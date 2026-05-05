@@ -40,13 +40,18 @@ contract PositionsVaultsEntrypoint is
     /// @notice Tracking data for each withdrawal request.
     mapping(bytes32 requestId => WithdrawData withdrawData) public withdrawData;
     /// @notice Tracking withdrawal data for liquidations.
-    mapping(address handler => mapping(uint256 tokenId => WithdrawData withdrawData)) public liquidationData;
+    mapping(address handler => mapping(uint256 tokenId => WithdrawData withdrawData))
+    public liquidationData;
 
     /// @notice Sets the admin, upgrader, and relayer, while providing the necessary roles.
     /// @param _admin The admin address.
     /// @param _upgrader The upgrader address.
     /// @param _relayer The positions relayer contract address.
-    function initialize(address _admin, address _upgrader, address _relayer) public initializer {
+    function initialize(
+        address _admin,
+        address _upgrader,
+        address _relayer
+    ) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
 
@@ -58,7 +63,9 @@ contract PositionsVaultsEntrypoint is
 
     /// @notice Admin-only function to set the new relayer address.
     /// @param _newRelayer The new relayer address.
-    function setPositionsRelayer(address _newRelayer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setPositionsRelayer(
+        address _newRelayer
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         relayer = _newRelayer;
 
         emit RelayerSet(_newRelayer);
@@ -66,8 +73,11 @@ contract PositionsVaultsEntrypoint is
 
     /// @notice Admin-only function to add a new vault handler.
     /// @param _handler The vault handler address.
-    function addHandler(address _handler) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_handler == address(0)) revert PositionsVaultsEntryPoint__AddressZero();
+    function addHandler(
+        address _handler
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_handler == address(0))
+            revert PositionsVaultsEntryPoint__AddressZero();
 
         if (supportedHandlers.add(_handler)) {
             emit HandlerAdded(_handler);
@@ -76,8 +86,11 @@ contract PositionsVaultsEntrypoint is
 
     /// @notice Admin-only function to remove an existing vault handler.
     /// @param _handler The vault handler address.
-    function removeHandler(address _handler) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_handler == address(0)) revert PositionsVaultsEntryPoint__AddressZero();
+    function removeHandler(
+        address _handler
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_handler == address(0))
+            revert PositionsVaultsEntryPoint__AddressZero();
 
         if (supportedHandlers.remove(_handler)) {
             emit HandlerRemoved(_handler);
@@ -103,7 +116,14 @@ contract PositionsVaultsEntrypoint is
 
         IHandler(_handler).deposit(_token, _amount, _tokenId, _additionalData);
 
-        emit Deposit(msg.sender, _token, _handler, block.chainid, _amount, _tokenId);
+        emit Deposit(
+            msg.sender,
+            _token,
+            _handler,
+            block.chainid,
+            _amount,
+            _tokenId
+        );
     }
 
     /// @notice Allows a user to request for withdrawal from a supported vault.
@@ -124,7 +144,9 @@ contract PositionsVaultsEntrypoint is
         _revertIfUnsupportedHandler(_handler);
         _validateNFTOwnership(_tokenId, _proof);
 
-        bytes32 requestId = keccak256(abi.encode(_tokenId, _handler, nonces[_tokenId]++));
+        bytes32 requestId = keccak256(
+            abi.encode(_tokenId, _handler, nonces[_tokenId]++)
+        );
         WithdrawData memory withdrawalData = WithdrawData({
             status: Status.PENDING,
             poolOrVault: abi.decode(_additionalData, (uint256)),
@@ -135,9 +157,22 @@ contract PositionsVaultsEntrypoint is
         });
         withdrawData[requestId] = withdrawalData;
 
-        IHandler(_handler).queueWithdraw(_token, _amount, _tokenId, _additionalData);
+        IHandler(_handler).queueWithdraw(
+            _token,
+            _amount,
+            _tokenId,
+            _additionalData
+        );
 
-        emit WithdrawRequest(requestId, msg.sender, _token, _handler, block.chainid, _amount, _tokenId);
+        emit WithdrawRequest(
+            requestId,
+            msg.sender,
+            _token,
+            _handler,
+            block.chainid,
+            _amount,
+            _tokenId
+        );
 
         return requestId;
     }
@@ -156,15 +191,27 @@ contract PositionsVaultsEntrypoint is
         _revertIfUnsupportedHandler(_handler);
 
         WithdrawData memory withdrawalData = withdrawData[_requestId];
-        if (withdrawalData.status != Status.ACCEPTED) revert PositionsVaultsEntrypoint__UnacceptedRequest(_requestId);
+        if (withdrawalData.status != Status.ACCEPTED)
+            revert PositionsVaultsEntrypoint__UnacceptedRequest(_requestId);
         _validateNFTOwnership(withdrawalData.tokenId, _proof);
 
         withdrawData[_requestId].status = Status.COMPLETED;
 
-        (address token, uint256 amount) =
-            IHandler(_handler).completeWithdraw(withdrawalData, msg.sender, _additionalData);
+        (address token, uint256 amount) = IHandler(_handler).completeWithdraw(
+            withdrawalData,
+            msg.sender,
+            _additionalData
+        );
 
-        emit Withdraw(_requestId, msg.sender, token, _handler, block.chainid, amount, withdrawalData.tokenId);
+        emit Withdraw(
+            _requestId,
+            msg.sender,
+            token,
+            _handler,
+            block.chainid,
+            amount,
+            withdrawalData.tokenId
+        );
     }
 
     /// @notice Allows the relayer to liquidate unhealthy positions.
@@ -194,9 +241,22 @@ contract PositionsVaultsEntrypoint is
         });
         liquidationData[_handler][_tokenId] = withdrawalData;
 
-        IHandler(_handler).liquidate(_token, _amount, _tokenId, _liquidator, _additionalData);
+        IHandler(_handler).liquidate(
+            _token,
+            _amount,
+            _tokenId,
+            _liquidator,
+            _additionalData
+        );
 
-        emit Liquidation(_liquidator, _token, _handler, block.chainid, _amount, _tokenId);
+        emit Liquidation(
+            _liquidator,
+            _token,
+            _handler,
+            block.chainid,
+            _amount,
+            _tokenId
+        );
     }
 
     /// @notice Completes liquidation by withdrawing funds from the handler.
@@ -204,24 +264,42 @@ contract PositionsVaultsEntrypoint is
     /// @param _handler The vault handler address.
     /// @param _tokenId The user's Nft tokenId.
     /// @param _additionalData Additional handler-specific data.
-    function completeLiquidation(address _handler, uint256 _tokenId, bytes calldata _additionalData) external {
+    function completeLiquidation(
+        address _handler,
+        uint256 _tokenId,
+        bytes calldata _additionalData
+    ) external {
         _revertIfUnsupportedHandler(_handler);
 
-        WithdrawData memory withdrawalData = liquidationData[_handler][_tokenId];
+        WithdrawData memory withdrawalData = liquidationData[_handler][
+                    _tokenId
+            ];
+        if (withdrawalData.status != Status.ACCEPTED)
+            revert PositionsVaultsEntrypoint__UnacceptedRequest(
+                bytes32(_tokenId)
+            );
         liquidationData[_handler][_tokenId].status = Status.COMPLETED;
 
-        (address token, uint256 amount) = IHandler(_handler).completeLiquidation(withdrawalData, _additionalData);
+        (address token, uint256 amount) = IHandler(_handler)
+            .completeLiquidation(withdrawalData, _additionalData);
 
-        emit LiquidationCompleted(withdrawalData.to, token, _handler, block.chainid, amount, withdrawalData.tokenId);
+        emit LiquidationCompleted(
+            withdrawalData.to,
+            token,
+            _handler,
+            block.chainid,
+            amount,
+            withdrawalData.tokenId
+        );
     }
 
     /// @notice Relayer-only function to approve or reject withdrawal requests.
     /// @param _requestIds The withdrawal request Ids.
     /// @param _statuses Approval or rejection statuses for requests.
-    function setWithdrawalStatus(bytes32[] memory _requestIds, Status[] memory _statuses)
-        external
-        onlyRole(RELAYER_ROLE)
-    {
+    function setWithdrawalStatus(
+        bytes32[] memory _requestIds,
+        Status[] memory _statuses
+    ) external onlyRole(RELAYER_ROLE) {
         if (_requestIds.length != _statuses.length) {
             revert PositionsVaultsEntryPoint__ArrayLengthMismatch();
         }
@@ -230,27 +308,46 @@ contract PositionsVaultsEntrypoint is
             Status status = _statuses[i];
 
             if (status == Status.ACCEPTED) {
-                WithdrawData memory withdrawalData = withdrawData[_requestIds[i]];
+                WithdrawData memory withdrawalData = withdrawData[
+                                _requestIds[i]
+                    ];
                 if (withdrawalData.status != Status.PENDING) {
                     revert PositionsVaultsEntryPoint__InvalidWithdrawStatus();
                 }
-                IHandler(withdrawalData.handler).withdrawalRequestAccepted(withdrawalData);
+                IHandler(withdrawalData.handler).withdrawalRequestAccepted(
+                    withdrawalData
+                );
             }
             withdrawData[_requestIds[i]].status = _statuses[i];
         }
     }
 
     function _revertIfUnsupportedHandler(address _handler) internal view {
-        if (!supportedHandlers.contains(_handler)) revert PositionsVaultsEntrypoint__UnsupportedHandler();
+        if (!supportedHandlers.contains(_handler))
+            revert PositionsVaultsEntrypoint__UnsupportedHandler();
     }
 
-    function _validateNFTOwnership(uint256 _tokenId, bytes32[] calldata _proof) internal view {
-        if (!IPositionsRelayer(relayer).verifyNFTOwnership(msg.sender, _tokenId, _proof)) {
-            revert PositionsVaultsEntryPoint__NFTOwnershipVerificationFailed(msg.sender, _tokenId);
+    function _validateNFTOwnership(
+        uint256 _tokenId,
+        bytes32[] calldata _proof
+    ) internal view {
+        if (
+            !IPositionsRelayer(relayer).verifyNFTOwnership(
+            msg.sender,
+            _tokenId,
+            _proof
+        )
+        ) {
+            revert PositionsVaultsEntryPoint__NFTOwnershipVerificationFailed(
+                msg.sender,
+                _tokenId
+            );
         }
     }
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal virtual override onlyRole(UPGRADER_ROLE) {}
 
     /// @notice Gets a set of all supported handlers.
     function getSupportedHandlers() external view returns (address[] memory) {

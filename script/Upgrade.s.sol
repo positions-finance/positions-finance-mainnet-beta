@@ -12,10 +12,10 @@ contract UpgradePolymarketVault is Script {
         uint256 deployerPrivateKey = 0x0;
 
         // 2. Hardcode the Proxy and Existing Implementation addresses
-        address proxyAddress = 0x0Ea8C132F7D30E01E1F99988cEE8E195A89D29F7;
+        address proxyAddress = 0xf79fc543a49C3f28156452587cfd77cbD2aD075b;
 
         // Replace with the address of the implementation contract you already deployed
-        address existingImplementation = 0xf767F93dd72e909b17aeD00b19dA76a8E9764964;
+        address existingImplementation = 0x367be24bEb6e0d1513DabbF43907449c0e8ca28B;
 
         vm.startBroadcast(deployerPrivateKey);
 
