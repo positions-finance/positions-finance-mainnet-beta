@@ -12,6 +12,7 @@ import {EnumerableSet} from "@openzeppelin-contracts-5.3.0/utils/structs/Enumera
 
 import {IPriceOracle} from "../../interfaces/oracle/IPriceOracle.sol";
 import {IPositionsRelayer} from "../../interfaces/poc/IPositionsRelayer.sol";
+import {IPositionsLendingPoolHandler} from "../../interfaces/handlers/IPositionsLendingPoolHandler.sol";
 
 /// @title PositionsLendingPool.
 /// @author Positions Team.
@@ -106,6 +107,26 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     mapping(uint256 tokenId => mapping(address asset => EnumerableSet.Bytes32Set requestIds)) private
     userToAssetToRequestIds;
 
+    /// @notice The protocol backend authorised to settle bare token transfers into positions, and to push
+    /// borrowed or withdrawn funds out on behalf of users who cannot call this pool themselves.
+    /// @dev A Polymarket Deposit Wallet is one such user: Polymarket's relayer only relays calls to
+    /// contracts it has whitelisted, so the wallet can transfer tokens here but never call this contract.
+    address public operator;
+    /// @notice The amount of each asset this pool has already recognised in its internal ledger.
+    /// @dev Anything held above this figure arrived as a bare transfer and is settleable. Bounding the
+    /// operator to that surplus means it can attribute incoming funds but never credit funds that never
+    /// arrived.
+    mapping(address asset => uint256 amount) public accountedBalance;
+    /// @notice Whether an asset's accounted balance has been snapshotted against its real balance.
+    /// @dev Settlement is refused until it has. Without this an asset that predates the transfer
+    /// settlement upgrade and was missed at initialization would read as having its entire balance
+    /// unaccounted, and so be creditable to anyone.
+    mapping(address asset => bool synced) public accountedBalanceSynced;
+    /// @notice The lending pool handler, which holds every collateral position on behalf of Nfts.
+    /// @dev Settled deposits are supplied under the handler and attributed to an Nft by it, so that a
+    /// transfer-based deposit becomes collateral exactly like one made through the entrypoint.
+    address public lendingPoolHandler;
+
     //////////////
     /// Events ///
     //////////////
@@ -121,6 +142,14 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     event BorrowRequestFulfilled(uint256 indexed tokenId, address indexed asset, uint256 indexed amount);
     event Repay(address by, address indexed asset, uint256 indexed amount, uint256 indexed tokenId);
     event BorrowRequest(bytes32 indexed requestId);
+    event OperatorSet(address indexed newOperator);
+    event LendingPoolHandlerSet(address indexed newHandler);
+    event AccountedBalanceSynced(address indexed asset, uint256 indexed amount);
+    event TransferSettled(
+        address indexed user, address indexed asset, uint256 indexed tokenId, uint256 repaid, uint256 supplied
+    );
+    event OperatorBorrow(uint256 indexed tokenId, address indexed asset, uint256 indexed amount, address to);
+    event OperatorBorrowFee(uint256 indexed tokenId, address indexed asset, uint256 indexed fee, address recipient);
 
     //////////////
     /// Errors ///
@@ -138,6 +167,10 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     error LendingPoolDoesNotExist(PoolData lendingPoolData);
     error InsufficientBalance();
     error NotRelayer();
+    error NotOperator(address caller, address operator);
+    error UnaccountedTransferTooSmall(uint256 requested, uint256 available);
+    error AccountedBalanceNotSynced(address asset);
+    error LendingPoolHandlerNotSet();
 
     /////////////////
     /// Modifiers ///
@@ -146,6 +179,13 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
     modifier onlyRelayer() {
         if (msg.sender != positionsRelayer) {
             revert NotPositionsRelayer(msg.sender, positionsRelayer);
+        }
+        _;
+    }
+
+    modifier onlyOperator() {
+        if (msg.sender != operator) {
+            revert NotOperator(msg.sender, operator);
         }
         _;
     }
@@ -170,9 +210,50 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         reserveFactor = _initialReserveFactor;
     }
 
+    /// @notice Sets the operator and takes the initial snapshot of the pool's accounted balances.
+    /// @dev Must run in the same transaction as the upgrade that introduces transfer settlement.
+    /// Skipping it would leave every asset already held by the pool looking like an unaccounted
+    /// transfer, and therefore creditable by the operator.
+    /// @param _operator The protocol backend address.
+    /// @param _assets The assets to snapshot. Pass every asset the pool currently holds.
+    function initializeTransferSettlement(address _operator, address[] calldata _assets)
+        external
+        onlyOwner
+        reinitializer(2)
+    {
+        _setOperator(_operator);
+        _syncAccountedBalance(_assets);
+    }
+
     //////////////////////////
     /// External functions ///
     //////////////////////////
+
+    /// @notice Allows the protocol admin to set the operator (protocol backend) address.
+    /// @param _newOperator The new operator address.
+    function setOperator(address _newOperator) external onlyOwner {
+        _setOperator(_newOperator);
+    }
+
+    /// @notice Allows the protocol admin to set the lending pool handler.
+    /// @param _newHandler The handler that holds collateral positions on behalf of Nfts.
+    function setLendingPoolHandler(address _newHandler) external onlyOwner {
+        if (_newHandler == address(0)) revert AddressZero();
+
+        lendingPoolHandler = _newHandler;
+
+        emit LendingPoolHandlerSet(_newHandler);
+    }
+
+    /// @notice Re-snapshots the pool's accounted balance for the given assets.
+    /// @dev Needed for assets whose lending pool is created after the transfer settlement upgrade, since
+    /// they hold no balance at that point. Only ever call this when there is no unsettled transfer in
+    /// flight for the asset: any surplus held at the time of the call is absorbed and stops being
+    /// creditable.
+    /// @param _assets The assets to snapshot.
+    function syncAccountedBalance(address[] calldata _assets) external onlyOwner {
+        _syncAccountedBalance(_assets);
+    }
 
     /// @notice Allows the protocol admin to set the positions relayer contract address.
     /// @param _newRelayer The new positions relayer contract address.
@@ -238,6 +319,10 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         poolData[_asset] = lendingPoolData;
         supportedAssets.add(_asset);
 
+        // Snapshots whatever the pool already holds, so a balance sent here before the pool existed
+        // does not read as a settleable transfer.
+        _syncAccountedBalance(_asset);
+
         emit LendingPoolCreated(_asset, lendingPoolData);
     }
 
@@ -271,16 +356,12 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         if (_for == address(0)) revert AddressZero();
 
         PoolData storage lendingPoolData = poolData[_asset];
-        LenderInfo storage lenderInfo = userToAssetToLendingInfo[_for][_asset];
 
         _revertIfLendingPoolDoesNotExist(lendingPoolData);
         _accrueInterest(_asset, lendingPoolData);
+        _supply(_asset, _amount, _for, lendingPoolData);
 
-        uint256 accruedInterest = _calculateAccruedLenderInterest(lendingPoolData, lenderInfo);
-        lenderInfo.depositAmount += _amount + accruedInterest;
-        lenderInfo.supplyIndexSnapshot = lendingPoolData.supplyIndex;
-
-        lendingPoolData.totalLent += _amount + accruedInterest;
+        accountedBalance[_asset] += _amount;
 
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
 
@@ -296,21 +377,11 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         if (_amount == 0) revert AmountZero();
 
         PoolData storage lendingPoolData = poolData[_asset];
-        LenderInfo storage lenderInfo = userToAssetToLendingInfo[msg.sender][_asset];
 
         _revertIfLendingPoolDoesNotExist(lendingPoolData);
         _accrueInterest(_asset, lendingPoolData);
 
-        uint256 accruedInterest = _calculateAccruedLenderInterest(lendingPoolData, lenderInfo);
-        if (_amount > lenderInfo.depositAmount + accruedInterest) revert InsufficientBalance();
-
-        uint256 withdrawAmount = _amount;
-        lenderInfo.depositAmount = lenderInfo.depositAmount + accruedInterest - _amount;
-        lenderInfo.supplyIndexSnapshot = lendingPoolData.supplyIndex;
-
-        lendingPoolData.totalLent -= _amount;
-
-        IERC20(_asset).safeTransfer(_to, withdrawAmount);
+        uint256 accruedInterest = _withdraw(msg.sender, _asset, _amount, _to, lendingPoolData);
 
         emit Withdraw(msg.sender, _amount, accruedInterest, _to);
     }
@@ -360,6 +431,8 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
 
         lendingPoolData.totalBorrowed += collateralRequest.tokenAmount;
 
+        _decreaseAccountedBalance(collateralRequest.token, collateralRequest.tokenAmount);
+
         IERC20(collateralRequest.token).safeTransfer(positionsRelayer, collateralRequest.tokenAmount);
 
         emit BorrowRequestFulfilled(collateralRequest.tokenId, collateralRequest.token, collateralRequest.tokenAmount);
@@ -374,21 +447,124 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
         if (_amount == 0) revert AmountZero();
 
         PoolData storage lendingPoolData = poolData[_asset];
-        BorrowerInfo storage borrowerInfo = tokenIdToAssetToBorrowInfo[_tokenId][_asset];
 
         _accrueInterest(_asset, lendingPoolData);
-        uint256 totalDebt = _calculateBorrowerDebt(lendingPoolData, borrowerInfo);
-        _amount = _amount > totalDebt ? totalDebt : _amount;
 
-        borrowerInfo.borrowedAmount = totalDebt - _amount;
+        uint256 repaid = _repay(_asset, _amount, _tokenId, lendingPoolData);
+
+        accountedBalance[_asset] += repaid;
+
+        IERC20(_asset).safeTransferFrom(msg.sender, address(this), repaid);
+
+        emit Repay(msg.sender, _asset, repaid, _tokenId);
+    }
+
+    /// @notice Settles assets transferred straight into the pool, with no contract call.
+    /// @dev A Polymarket Deposit Wallet can only move ERC20s by plain transfer, and an ERC20 transfer
+    /// leaves no hook for this pool to react to. The operator watches for the transfer and calls this to
+    /// bind it to a position. The settled amount is capped by the pool's unaccounted surplus, so the
+    /// operator can only ever attribute funds that genuinely arrived.
+    /// Incoming funds clear debt before they earn: the amount covers the position's outstanding borrow
+    /// first, and only what is left over is supplied.
+    /// @param _user The account to credit any supplied remainder to.
+    /// @param _tokenId The Nft tokenId whose debt the transfer repays.
+    /// @param _asset The transferred asset.
+    /// @param _amount The transferred amount to settle.
+    /// @return repaid The portion applied to outstanding debt.
+    /// @return supplied The portion supplied on the user's behalf.
+    function settleTransfer(address _user, uint256 _tokenId, address _asset, uint256 _amount)
+        external
+        onlyOperator
+        returns (uint256 repaid, uint256 supplied)
+    {
+        if (_user == address(0) || _asset == address(0)) revert AddressZero();
+        if (_amount == 0) revert AmountZero();
+
+        PoolData storage lendingPoolData = poolData[_asset];
+
+        _revertIfLendingPoolDoesNotExist(lendingPoolData);
+        if (!accountedBalanceSynced[_asset]) revert AccountedBalanceNotSynced(_asset);
+
+        uint256 balance = IERC20(_asset).balanceOf(address(this));
+        uint256 accounted = accountedBalance[_asset];
+        uint256 unaccounted = balance > accounted ? balance - accounted : 0;
+        if (_amount > unaccounted) revert UnaccountedTransferTooSmall(_amount, unaccounted);
+
+        accountedBalance[_asset] += _amount;
+
+        _accrueInterest(_asset, lendingPoolData);
+
+        repaid = _repay(_asset, _amount, _tokenId, lendingPoolData);
+        supplied = _amount - repaid;
+
+        if (supplied > 0) {
+            address handler = lendingPoolHandler;
+            if (handler == address(0)) revert LendingPoolHandlerNotSet();
+
+            // Supplied under the handler, not the depositor. The handler is the lender of record for
+            // every collateral position, and crediting the depositor directly would instead create a
+            // bare lender position they could withdraw at will, leaving their debt unbacked.
+            _supply(_asset, supplied, handler, lendingPoolData);
+            IPositionsLendingPoolHandler(handler).creditSettledDeposit(_asset, supplied, _tokenId);
+        }
+
+        emit TransferSettled(_user, _asset, _tokenId, repaid, supplied);
+
+        // Mirrored so the existing indexers pick transfer based deposits and repayments up unchanged.
+        if (repaid > 0) emit Repay(msg.sender, _asset, repaid, _tokenId);
+        if (supplied > 0) emit Supply(msg.sender, _asset, supplied, _user);
+    }
+
+    /// @notice Opens or increases a borrow position on behalf of a user, and pushes the funds out.
+    /// @dev The relayer borrow flow starts with the borrower calling borrowRequest(), which a Deposit
+    /// Wallet cannot do. The operator runs the same collateral and health checks the relayer backend
+    /// applies to a collateral request, then calls this.
+    /// @param _tokenId The borrower's Nft tokenId.
+    /// @param _asset The asset to borrow.
+    /// @param _amount The amount to borrow.
+    /// @param _to The recipient of the borrowed funds.
+    function operatorBorrow(uint256 _tokenId, address _asset, uint256 _amount, address _to) external onlyOperator {
+        if (_asset == address(0) || _to == address(0)) revert AddressZero();
+        if (_amount == 0) revert AmountZero();
+
+        PoolData storage lendingPoolData = poolData[_asset];
+        BorrowerInfo storage borrowerInfo = tokenIdToAssetToBorrowInfo[_tokenId][_asset];
+
+        _revertIfLendingPoolDoesNotExist(lendingPoolData);
+        _accrueInterest(_asset, lendingPoolData);
+
+        if (lendingPoolData.totalBorrowed + _amount > lendingPoolData.totalLent) {
+            revert InsufficientLiquidityInLendingPool();
+        }
+
+        // Fold the interest accrued so far into the principal before resetting the snapshot, otherwise
+        // moving the snapshot forward would write that interest off.
+        borrowerInfo.borrowedAmount = _calculateBorrowerDebt(lendingPoolData, borrowerInfo) + _amount;
         borrowerInfo.borrowIndexSnapshot = lendingPoolData.borrowIndex;
 
-        lendingPoolData.totalBorrowed -= (_amount * E27) / lendingPoolData.borrowIndex;
+        lendingPoolData.totalBorrowed += _amount;
 
-        IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
+        // The relayer charges an origination fee on every borrow it fulfils, and this path does not go
+        // through the relayer. Charging the same fee here keeps a Deposit Wallet borrow priced exactly
+        // like an Nft owner's, rather than making this the cheaper way to borrow. Read live so the two
+        // paths cannot drift apart. Debt is the full amount either way, matching the relayer.
+        uint256 fee = (_amount * IPositionsRelayer(positionsRelayer).feePercentage()) / BPS;
+        address feeRecipient = IPositionsRelayer(positionsRelayer).feeReceipient();
 
-        emit Repay(msg.sender, _asset, _amount, _tokenId);
+        if (fee > 0 && feeRecipient == address(0)) revert AddressZero();
+
+        _decreaseAccountedBalance(_asset, _amount);
+
+        if (fee > 0) IERC20(_asset).safeTransfer(feeRecipient, fee);
+        IERC20(_asset).safeTransfer(_to, _amount - fee);
+
+        emit OperatorBorrow(_tokenId, _asset, _amount, _to);
+        emit OperatorBorrowFee(_tokenId, _asset, fee, feeRecipient);
     }
+
+    // Note: there is deliberately no operatorWithdraw here. Collateral is held by the handler, not by
+    // the depositor, so exiting a position means debiting the handler's Nft accounting as well as the
+    // pool's ledger. That lives on the handler, which calls withdraw() here as the lender of record.
 
     /// @notice Utility function to accrue interest and update the supply and borrow indices.
     /// @param _asset The asset address.
@@ -404,6 +580,90 @@ contract PositionsLendingPool is Initializable, UUPSUpgradeable, OwnableUpgradea
 
     function _revertIfLendingPoolDoesNotExist(PoolData memory _lendingPoolData) internal pure {
         if (_lendingPoolData.lastAccrualTimestamp == 0) revert LendingPoolDoesNotExist(_lendingPoolData);
+    }
+
+    function _setOperator(address _newOperator) internal {
+        if (_newOperator == address(0)) revert AddressZero();
+
+        operator = _newOperator;
+
+        emit OperatorSet(_newOperator);
+    }
+
+    function _syncAccountedBalance(address[] calldata _assets) internal {
+        for (uint256 i; i < _assets.length; ++i) {
+            _syncAccountedBalance(_assets[i]);
+        }
+    }
+
+    function _syncAccountedBalance(address _asset) internal {
+        uint256 balance = IERC20(_asset).balanceOf(address(this));
+
+        accountedBalance[_asset] = balance;
+        accountedBalanceSynced[_asset] = true;
+
+        emit AccountedBalanceSynced(_asset, balance);
+    }
+
+    /// @dev Saturating, so an asset that was never snapshotted cannot brick withdrawals and borrows by
+    /// underflowing. The floor only ever understates what the pool has accounted for.
+    function _decreaseAccountedBalance(address _asset, uint256 _amount) internal {
+        uint256 accounted = accountedBalance[_asset];
+        accountedBalance[_asset] = accounted > _amount ? accounted - _amount : 0;
+    }
+
+    /// @dev Credits a supply position. Expects interest to have been accrued for the pool already.
+    function _supply(address _asset, uint256 _amount, address _for, PoolData storage _lendingPoolData) internal {
+        LenderInfo storage lenderInfo = userToAssetToLendingInfo[_for][_asset];
+
+        uint256 accruedInterest = _calculateAccruedLenderInterest(_lendingPoolData, lenderInfo);
+        lenderInfo.depositAmount += _amount + accruedInterest;
+        lenderInfo.supplyIndexSnapshot = _lendingPoolData.supplyIndex;
+
+        _lendingPoolData.totalLent += _amount + accruedInterest;
+    }
+
+    /// @dev Exits part of a supply position and transfers the assets out. Expects interest to have been
+    /// accrued for the pool already.
+    function _withdraw(
+        address _user,
+        address _asset,
+        uint256 _amount,
+        address _to,
+        PoolData storage _lendingPoolData
+    ) internal returns (uint256 accruedInterest) {
+        LenderInfo storage lenderInfo = userToAssetToLendingInfo[_user][_asset];
+
+        accruedInterest = _calculateAccruedLenderInterest(_lendingPoolData, lenderInfo);
+        if (_amount > lenderInfo.depositAmount + accruedInterest) revert InsufficientBalance();
+
+        lenderInfo.depositAmount = lenderInfo.depositAmount + accruedInterest - _amount;
+        lenderInfo.supplyIndexSnapshot = _lendingPoolData.supplyIndex;
+
+        _lendingPoolData.totalLent -= _amount;
+
+        _decreaseAccountedBalance(_asset, _amount);
+
+        IERC20(_asset).safeTransfer(_to, _amount);
+    }
+
+    /// @dev Applies up to `_amount` against a position's outstanding debt and reports how much was used.
+    /// Does not move any assets. Expects interest to have been accrued for the pool already.
+    function _repay(address _asset, uint256 _amount, uint256 _tokenId, PoolData storage _lendingPoolData)
+        internal
+        returns (uint256 repaid)
+    {
+        BorrowerInfo storage borrowerInfo = tokenIdToAssetToBorrowInfo[_tokenId][_asset];
+
+        uint256 totalDebt = _calculateBorrowerDebt(_lendingPoolData, borrowerInfo);
+        if (totalDebt == 0) return 0;
+
+        repaid = _amount > totalDebt ? totalDebt : _amount;
+
+        borrowerInfo.borrowedAmount = totalDebt - repaid;
+        borrowerInfo.borrowIndexSnapshot = _lendingPoolData.borrowIndex;
+
+        _lendingPoolData.totalBorrowed -= (repaid * E27) / _lendingPoolData.borrowIndex;
     }
 
     function _accrueInterest(address _asset, PoolData storage _lendingPoolData) internal {

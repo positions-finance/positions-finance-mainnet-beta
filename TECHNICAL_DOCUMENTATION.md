@@ -315,6 +315,46 @@ ERC721 NFT that serves as proof of collateral for cross-chain operations. Each u
 - **Returns**: None
 - **Access**: Public
 
+##### `settleTransfer(address _user, uint256 _tokenId, address _asset, uint256 _amount)`
+- **Purpose**: Settles an asset that arrived by bare ERC20 transfer, with no contract call. Repays the position's outstanding debt first, and supplies only the excess as collateral.
+- **Inputs**:
+  - `_user`: Account to credit any supplied remainder to
+  - `_tokenId`: NFT tokenId whose debt the transfer repays
+  - `_asset`: The transferred asset
+  - `_amount`: The transferred amount to settle
+- **Returns**: `uint256 repaid`, `uint256 supplied`
+- **Access**: Operator only
+- **Notes**: A Polymarket Deposit Wallet can only move ERC20s by plain transfer, and ERC20 has no receive hook, so the operator settles the transfer after observing it. The amount is capped by the pool's unaccounted surplus (`balanceOf - accountedBalance`), so the operator can attribute funds that genuinely arrived but can never credit funds that did not. The supplied leg is credited under the **handler**, which then attributes it to the NFT, so it becomes collateral rather than a bare lender position the depositor could withdraw out from under their own debt. Reverts with `AccountedBalanceNotSynced` if the asset has never been snapshotted.
+
+##### `operatorBorrow(uint256 _tokenId, address _asset, uint256 _amount, address _to)`
+- **Purpose**: Opens or increases a borrow position on behalf of an account that cannot call `borrowRequest()`, and pushes the funds out.
+- **Inputs**:
+  - `_tokenId`: Borrower's NFT tokenId
+  - `_asset`: Asset to borrow
+  - `_amount`: Amount to borrow
+  - `_to`: Recipient of the borrowed funds
+- **Returns**: None
+- **Access**: Operator only
+- **Notes**: Charges the same origination fee the relayer takes on a borrow it fulfils, read live from `positionsRelayer`, so a Deposit Wallet borrow is priced identically to one made through the relayer. Debt recorded is the full amount; the recipient receives `amount - fee`.
+
+##### `initializeTransferSettlement(address _operator, address[] calldata _assets)`
+- **Purpose**: Sets the operator and takes the initial snapshot of accounted balances.
+- **Access**: Owner only, `reinitializer(2)`
+- **Notes**: **Must run in the same transaction as the upgrade that introduces transfer settlement.** Skipping it would leave every asset already held by the pool reading as an unaccounted transfer, and therefore creditable to anyone.
+
+##### `syncAccountedBalance(address[] calldata _assets)`
+- **Purpose**: Re-snapshots the accounted balance for the given assets.
+- **Access**: Owner only
+- **Notes**: Needed for assets whose pool is created outside `createLendingPool`. Only call when no unsettled transfer is in flight: any surplus held at the time is absorbed and stops being creditable.
+
+##### `setLendingPoolHandler(address _newHandler)`
+- **Purpose**: Sets the handler that holds collateral positions on behalf of NFTs.
+- **Access**: Owner only
+
+##### `setOperator(address _newOperator)`
+- **Purpose**: Sets the protocol backend allowed to settle transfers and push borrowed funds.
+- **Access**: Owner only
+
 ##### `accrueInterest(address _asset)`
 - **Purpose**: Manually accrue interest for a pool (updates indices)
 - **Inputs**:
@@ -622,6 +662,38 @@ All handlers implement the `IHandler` interface and provide similar functionalit
   - `_additionalData`: Vault-specific data (encoded vault address)
 - **Returns**: None
 - **Access**: Entrypoint only
+
+#### LendingPoolHandler — Deposit Wallet Functions
+
+The handler is the lender of record for every collateral position, so both of these live here rather
+than on the pool.
+
+##### `creditSettledDeposit(address _token, uint256 _amount, uint256 _tokenId)`
+- **Purpose**: Attributes a deposit the lending pool has already supplied under this handler to an NFT.
+- **Inputs**:
+  - `_token`: Token address
+  - `_amount`: Amount already supplied on the handler's behalf
+  - `_tokenId`: User's NFT tokenId
+- **Returns**: None
+- **Access**: Lending pool only
+- **Notes**: Mirrors `deposit()` minus the token movement, since the pool already holds the tokens. This is what makes a transfer-based deposit real collateral rather than a bare lender position.
+
+##### `operatorWithdraw(address _token, uint256 _amount, uint256 _tokenId, address _to)`
+- **Purpose**: Pushes collateral out of the lending pool on an NFT's behalf.
+- **Inputs**:
+  - `_token`: Token address
+  - `_amount`: Amount to withdraw
+  - `_tokenId`: User's NFT tokenId
+  - `_to`: Recipient of the withdrawn tokens
+- **Returns**: None
+- **Access**: Operator only
+- **Notes**: The counterpart to the entrypoint withdrawal flow for accounts that cannot call it. Debits the NFT position, folding accrued interest into principal before moving the snapshot forward, then calls `withdraw()` on the pool as lender of record.
+
+##### `setOperator(address _newOperator)`
+- **Purpose**: Sets the protocol backend allowed to push withdrawals.
+- **Access**: `DEFAULT_ADMIN_ROLE`
+
+#### Common Handler Functions (continued)
 
 ##### `queueWithdraw(address _token, uint256 _amount, uint256 _tokenId, bytes calldata _additionalData)`
 - **Purpose**: Queues a withdrawal request

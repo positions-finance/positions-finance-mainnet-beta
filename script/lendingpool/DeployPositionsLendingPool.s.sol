@@ -68,6 +68,37 @@ contract UpgradePositionsLendingPool is Script {
 
         return PositionsLendingPool(proxyAddress);
     }
+
+    /// @notice Upgrade an existing LendingPool proxy to transfer settlement, snapshotting its balances
+    /// in the same transaction.
+    /// @dev Use this, not run(address), for the upgrade that introduces settleTransfer(). Snapshotting
+    /// separately would leave the pool's entire existing balance settleable in between.
+    /// @param proxyAddress The existing proxy address to upgrade.
+    /// @param operator The protocol backend address allowed to settle transfers and push funds.
+    /// @param assets Every asset the pool currently holds a balance of.
+    function run(address proxyAddress, address operator, address[] memory assets)
+        public
+        returns (PositionsLendingPool)
+    {
+        require(proxyAddress != address(0), "Proxy address cannot be zero");
+        require(operator != address(0), "Operator address cannot be zero");
+
+        Options memory opts;
+        opts.unsafeSkipAllChecks = true;
+
+        vm.startBroadcast();
+
+        Upgrades.upgradeProxy(
+            proxyAddress,
+            "PositionsLendingPool.sol",
+            abi.encodeCall(PositionsLendingPool.initializeTransferSettlement, (operator, assets)),
+            opts
+        );
+
+        vm.stopBroadcast();
+
+        return PositionsLendingPool(proxyAddress);
+    }
 }
 
 contract CreateLendingPool is Script {

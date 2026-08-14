@@ -30,14 +30,34 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
     /// @notice Mapping to store deposits of users.
     mapping(uint256 tokenId => mapping(address asset => Position position)) public positions;
 
+    /// @notice The protocol backend, allowed to push withdrawals for accounts that cannot call the
+    /// entrypoint themselves.
+    address public operator;
+
     event EntrypointSet(address indexed newEntrypoint);
+    event OperatorSet(address indexed newOperator);
+    event SettledDepositCredited(uint256 indexed tokenId, address indexed asset, uint256 indexed amount);
+    event OperatorWithdraw(uint256 indexed tokenId, address indexed asset, uint256 indexed amount, address to);
 
     error PositionsLendingPoolHandler__NotEntryPoint();
+    error PositionsLendingPoolHandler__NotLendingPool();
+    error PositionsLendingPoolHandler__NotOperator();
+    error PositionsLendingPoolHandler__AddressZero();
     error PositionsLendingPoolHandler__TokenAddressMismatch();
     error PositionsLendingPoolHandler__InsufficientBalance(uint256 amountToWithdraw, uint256 withdrawableAmount);
 
     modifier onlyEntryPoint() {
         if (msg.sender != entrypoint) revert PositionsLendingPoolHandler__NotEntryPoint();
+        _;
+    }
+
+    modifier onlyLendingPool() {
+        if (msg.sender != lendingPool) revert PositionsLendingPoolHandler__NotLendingPool();
+        _;
+    }
+
+    modifier onlyOperator() {
+        if (msg.sender != operator) revert PositionsLendingPoolHandler__NotOperator();
         _;
     }
 
@@ -88,6 +108,74 @@ contract PositionsLendingPoolHandler is UUPSUpgradeable, AccessControlUpgradeabl
 
         positions[_tokenId][_token].depositAmount = amountWithInterest + _amount;
         positions[_tokenId][_token].supplyIndexSnapshot = supplyIndex;
+    }
+
+    /// @notice Allows the admin to set the operator.
+    /// @param _newOperator The protocol backend address.
+    function setOperator(address _newOperator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_newOperator == address(0)) revert PositionsLendingPoolHandler__AddressZero();
+
+        operator = _newOperator;
+
+        emit OperatorSet(_newOperator);
+    }
+
+    /// @notice Credits a deposit the lending pool has already settled into this handler's position.
+    /// @dev A Deposit Wallet cannot approve and call the entrypoint, so it transfers straight to the
+    /// pool instead. The pool supplies those tokens under this handler and calls here to attribute
+    /// them to an Nft, which is what makes the deposit collateral rather than a bare lender position
+    /// the depositor could withdraw out from under their own debt.
+    /// Mirrors deposit(), minus the token movement, since the pool already holds the tokens.
+    /// @param _token The token address.
+    /// @param _amount The amount already supplied on this handler's behalf.
+    /// @param _tokenId The user's Nft token Id.
+    function creditSettledDeposit(address _token, uint256 _amount, uint256 _tokenId) external onlyLendingPool {
+        (,, uint256 supplyIndex,,,) = IPositionsLendingPool(lendingPool).poolData(_token);
+
+        uint256 amountWithInterest;
+        if (positions[_tokenId][_token].supplyIndexSnapshot > 0) {
+            amountWithInterest = (supplyIndex * positions[_tokenId][_token].depositAmount)
+                / positions[_tokenId][_token].supplyIndexSnapshot;
+        }
+
+        positions[_tokenId][_token].depositAmount = amountWithInterest + _amount;
+        positions[_tokenId][_token].supplyIndexSnapshot = supplyIndex;
+
+        emit SettledDepositCredited(_tokenId, _token, _amount);
+    }
+
+    /// @notice Pushes collateral out of the lending pool on an Nft's behalf.
+    /// @dev The counterpart to the entrypoint withdrawal flow for accounts that cannot call it. The
+    /// operator runs the same health checks the entrypoint's request path applies before calling.
+    /// @param _token The token address.
+    /// @param _amount The amount to withdraw.
+    /// @param _tokenId The user's Nft token Id.
+    /// @param _to The recipient of the withdrawn tokens.
+    function operatorWithdraw(address _token, uint256 _amount, uint256 _tokenId, address _to)
+    external
+    onlyOperator
+    {
+        if (_to == address(0)) revert PositionsLendingPoolHandler__AddressZero();
+
+        (,, uint256 currentSupplyIndex,,,) = IPositionsLendingPool(lendingPool).poolData(_token);
+        Position memory position = positions[_tokenId][_token];
+
+        uint256 withdrawableAmount = position.supplyIndexSnapshot > 0
+            ? (currentSupplyIndex * position.depositAmount) / position.supplyIndexSnapshot
+            : 0;
+
+        if (_amount > withdrawableAmount) {
+            revert PositionsLendingPoolHandler__InsufficientBalance(_amount, withdrawableAmount);
+        }
+
+        // Fold the interest earned so far into the principal before moving the snapshot forward,
+        // otherwise resetting it would discard that interest.
+        positions[_tokenId][_token].depositAmount = withdrawableAmount - _amount;
+        positions[_tokenId][_token].supplyIndexSnapshot = currentSupplyIndex;
+
+        IPositionsLendingPool(lendingPool).withdraw(_token, _amount, _to);
+
+        emit OperatorWithdraw(_tokenId, _token, _amount, _to);
     }
 
     /// @notice Queues tokens for withdrawal from the lending pool.

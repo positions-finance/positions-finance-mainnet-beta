@@ -44,4 +44,8 @@ interface IPositionsRelayer {
         external
         returns (bytes32 requestId);
     function verifyNFTOwnership(address user, uint256 tokenId, bytes32[] calldata proof) external view returns (bool);
+    /// @notice The fee (in bps) taken from each borrow the relayer fulfils.
+    function feePercentage() external view returns (uint256);
+    /// @notice The recipient of that fee.
+    function feeReceipient() external view returns (address);
 }
